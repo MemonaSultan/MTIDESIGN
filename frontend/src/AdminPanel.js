@@ -121,8 +121,45 @@ function AdminPanel(props) {
   };
 
   const selectedTab = adminTabs.find((tab) => tab.id === adminTab);
+  const isSuperAdmin = adminSession.user?.role === 'superadmin';
+  const visibleAdminTabs = adminTabs.filter((tab) => {
+    if (tab.id === 'superadmin' || tab.id === 'users') return isSuperAdmin;
+    return true;
+  });
+  const content = {
+    home: {
+      hero: adminData.content?.home?.hero || {},
+      offer: adminData.content?.home?.offer || {},
+    },
+    about: adminData.content?.about || {},
+    contact: adminData.content?.contact || {},
+  };
+  const settings = {
+    seo: adminData.settings?.seo || {},
+    appearance: adminData.settings?.appearance || {},
+    security: adminData.settings?.security || {},
+  };
   const recentBookings = adminData.overview?.recentBookings || adminData.bookings.slice(0, 5);
   const recentInquiries = adminData.overview?.recentInquiries || adminData.inquiries.slice(0, 5);
+  const overviewMetrics = adminData.overview?.metrics || [
+    { label: 'Users', value: adminData.users.length },
+    { label: 'Bookings', value: adminData.bookings.length },
+    { label: 'Inquiries', value: adminData.inquiries.length },
+    { label: 'Projects', value: adminData.projects.length },
+    { label: 'Products', value: adminData.products.length },
+    { label: 'Reviews', value: adminData.reviews.length },
+  ];
+  const overviewAnalytics = adminData.overview?.analytics || {
+    visitorsToday: 'Live',
+    weeklyVisitors: 'Live',
+    monthlyVisitors: 'Live',
+    conversionRate: 'Live',
+  };
+  const overviewPending = adminData.overview?.pending || {
+    bookings: adminData.bookings.filter((item) => item.status === 'pending').length,
+    inquiries: adminData.inquiries.filter((item) => item.status === 'new' || item.status === 'pending').length,
+    reviews: adminData.reviews.filter((item) => item.approved !== true).length,
+  };
   const liveContent = [
     { label: 'Published posts', value: adminData.blogs.filter((item) => item.published !== false).length },
     { label: 'Featured projects', value: adminData.projects.filter((item) => item.featured !== false).length },
@@ -138,7 +175,7 @@ function AdminPanel(props) {
         <article className="admin-card auth-card">
           <p className="section-tag">Admin Authentication</p>
           <h2>Staff dashboard login</h2>
-          <p>Admin access controls the storefront, catalog, customer requests, publishing, users, reports, and website settings.</p>
+          <p>Use the same email and password login as the public sign-in box. Admin accounts open this dashboard; client accounts open the client portal.</p>
           <form className="admin-stack" onSubmit={handleAdminLogin}>
             <label className="admin-field">
               <span>Email</span>
@@ -165,6 +202,16 @@ function AdminPanel(props) {
     );
   } else if (adminLoading) {
     body = <div className="admin-card admin-loading">Loading admin workspace...</div>;
+  } else if ((adminTab === 'superadmin' || adminTab === 'users') && !isSuperAdmin) {
+    body = (
+      <section className="admin-panel-block">
+        <article className="admin-card">
+          <p className="section-tag">Super Admin Required</p>
+          <h3>Staff and user control is locked</h3>
+          <p>Admins can manage the website, bookings, inquiries, catalog, content, reviews, reports, and settings. Only the superadmin can create admins, suspend users, or delete accounts.</p>
+        </article>
+      </section>
+    );
   } else if (['services', 'projects', 'products', 'blogs', 'notifications'].includes(adminTab)) {
     body = (
       <CollectionEditor
@@ -329,14 +376,14 @@ function AdminPanel(props) {
             {adminFeedback.content ? <span className="admin-feedback">{adminFeedback.content}</span> : null}
           </div>
           <div className="admin-form-grid">
-            <FieldControl field={{ label: 'Hero title' }} value={adminData.content.home.hero.title} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...current.content, home: { ...current.content.home, hero: { ...current.content.home.hero, title: value } } } }))} />
-            <FieldControl field={{ label: 'Offer title' }} value={adminData.content.home.offer.title} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...current.content, home: { ...current.content.home, offer: { ...current.content.home.offer, title: value } } } }))} />
-            <FieldControl field={{ label: 'Hero description', type: 'textarea' }} value={adminData.content.home.hero.description} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...current.content, home: { ...current.content.home, hero: { ...current.content.home.hero, description: value } } } }))} />
-            <FieldControl field={{ label: 'Offer description', type: 'textarea' }} value={adminData.content.home.offer.description} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...current.content, home: { ...current.content.home, offer: { ...current.content.home.offer, description: value } } } }))} />
-            <FieldControl field={{ label: 'About title' }} value={adminData.content.about.title} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...current.content, about: { ...current.content.about, title: value } } }))} />
-            <FieldControl field={{ label: 'About description', type: 'textarea' }} value={adminData.content.about.description} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...current.content, about: { ...current.content.about, description: value } } }))} />
-            <FieldControl field={{ label: 'Address' }} value={adminData.content.contact.address} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...current.content, contact: { ...current.content.contact, address: value } } }))} />
-            <FieldControl field={{ label: 'Primary phone' }} value={adminData.content.contact.primaryPhone} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...current.content, contact: { ...current.content.contact, primaryPhone: value } } }))} />
+            <FieldControl field={{ label: 'Hero title' }} value={content.home.hero.title} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...(current.content || {}), home: { ...(current.content?.home || {}), hero: { ...(current.content?.home?.hero || {}), title: value } } } }))} />
+            <FieldControl field={{ label: 'Offer title' }} value={content.home.offer.title} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...(current.content || {}), home: { ...(current.content?.home || {}), offer: { ...(current.content?.home?.offer || {}), title: value } } } }))} />
+            <FieldControl field={{ label: 'Hero description', type: 'textarea' }} value={content.home.hero.description} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...(current.content || {}), home: { ...(current.content?.home || {}), hero: { ...(current.content?.home?.hero || {}), description: value } } } }))} />
+            <FieldControl field={{ label: 'Offer description', type: 'textarea' }} value={content.home.offer.description} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...(current.content || {}), home: { ...(current.content?.home || {}), offer: { ...(current.content?.home?.offer || {}), description: value } } } }))} />
+            <FieldControl field={{ label: 'About title' }} value={content.about.title} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...(current.content || {}), about: { ...(current.content?.about || {}), title: value } } }))} />
+            <FieldControl field={{ label: 'About description', type: 'textarea' }} value={content.about.description} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...(current.content || {}), about: { ...(current.content?.about || {}), description: value } } }))} />
+            <FieldControl field={{ label: 'Address' }} value={content.contact.address} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...(current.content || {}), contact: { ...(current.content?.contact || {}), address: value } } }))} />
+            <FieldControl field={{ label: 'Primary phone' }} value={content.contact.primaryPhone} onChange={(value) => setAdminData((current) => ({ ...current, content: { ...(current.content || {}), contact: { ...(current.content?.contact || {}), primaryPhone: value } } }))} />
           </div>
           <div className="admin-actions">
             <button className="primary-action" type="button" onClick={saveContent}>Save content</button>
@@ -356,12 +403,12 @@ function AdminPanel(props) {
             {adminFeedback.settings ? <span className="admin-feedback">{adminFeedback.settings}</span> : null}
           </div>
           <div className="admin-form-grid">
-            <FieldControl field={{ label: 'Site title' }} value={adminData.settings?.seo.siteTitle} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...current.settings, seo: { ...current.settings.seo, siteTitle: value } } }))} />
-            <FieldControl field={{ label: 'Keywords' }} value={adminData.settings?.seo.keywords} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...current.settings, seo: { ...current.settings.seo, keywords: value } } }))} />
-            <FieldControl field={{ label: 'Meta description', type: 'textarea' }} value={adminData.settings?.seo.metaDescription} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...current.settings, seo: { ...current.settings.seo, metaDescription: value } } }))} />
-            <FieldControl field={{ label: 'Primary color' }} value={adminData.settings?.appearance.primaryColor} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...current.settings, appearance: { ...current.settings.appearance, primaryColor: value } } }))} />
-            <FieldControl field={{ label: 'Accent color' }} value={adminData.settings?.appearance.accentColor} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...current.settings, appearance: { ...current.settings.appearance, accentColor: value } } }))} />
-            <FieldControl field={{ label: 'Recovery email' }} value={adminData.settings?.security.recoveryEmail} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...current.settings, security: { ...current.settings.security, recoveryEmail: value } } }))} />
+            <FieldControl field={{ label: 'Site title' }} value={settings.seo.siteTitle} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), seo: { ...(current.settings?.seo || {}), siteTitle: value } } }))} />
+            <FieldControl field={{ label: 'Keywords' }} value={settings.seo.keywords} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), seo: { ...(current.settings?.seo || {}), keywords: value } } }))} />
+            <FieldControl field={{ label: 'Meta description', type: 'textarea' }} value={settings.seo.metaDescription} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), seo: { ...(current.settings?.seo || {}), metaDescription: value } } }))} />
+            <FieldControl field={{ label: 'Primary color' }} value={settings.appearance.primaryColor} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), appearance: { ...(current.settings?.appearance || {}), primaryColor: value } } }))} />
+            <FieldControl field={{ label: 'Accent color' }} value={settings.appearance.accentColor} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), appearance: { ...(current.settings?.appearance || {}), accentColor: value } } }))} />
+            <FieldControl field={{ label: 'Recovery email' }} value={settings.security.recoveryEmail} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), security: { ...(current.settings?.security || {}), recoveryEmail: value } } }))} />
           </div>
           <div className="admin-actions">
             <button className="primary-action" type="button" onClick={saveSettings}>Save settings</button>
@@ -399,10 +446,10 @@ function AdminPanel(props) {
           {adminData.report ? (
             <div className="list-block">
               <span>Format: {adminData.report.format}</span>
-              <span>Bookings: {adminData.report.summary.bookings}</span>
-              <span>Inquiries: {adminData.report.summary.inquiries}</span>
-              <span>Users: {adminData.report.summary.users}</span>
-              <span>Projects: {adminData.report.summary.projects}</span>
+              <span>Bookings: {adminData.report.summary?.bookings || 0}</span>
+              <span>Inquiries: {adminData.report.summary?.inquiries || 0}</span>
+              <span>Users: {adminData.report.summary?.users || 0}</span>
+              <span>Projects: {adminData.report.summary?.projects || 0}</span>
             </div>
           ) : null}
         </article>
@@ -412,7 +459,7 @@ function AdminPanel(props) {
     body = (
       <section className="admin-stack">
         <div className="metric-grid pro-metric-grid">
-          {adminData.overview?.metrics.map((metric) => (
+          {overviewMetrics.map((metric) => (
             <article className="admin-card metric-card" key={metric.label}>
               <span>{metric.label}</span>
               <strong>{metric.value}</strong>
@@ -433,19 +480,19 @@ function AdminPanel(props) {
             <div className="analytics-grid">
               <div>
                 <span>Today</span>
-                <strong>{adminData.overview?.analytics.visitorsToday}</strong>
+                <strong>{overviewAnalytics.visitorsToday}</strong>
               </div>
               <div>
                 <span>This week</span>
-                <strong>{adminData.overview?.analytics.weeklyVisitors}</strong>
+                <strong>{overviewAnalytics.weeklyVisitors}</strong>
               </div>
               <div>
                 <span>This month</span>
-                <strong>{adminData.overview?.analytics.monthlyVisitors}</strong>
+                <strong>{overviewAnalytics.monthlyVisitors}</strong>
               </div>
               <div>
                 <span>Conversion</span>
-                <strong>{adminData.overview?.analytics.conversionRate}</strong>
+                <strong>{overviewAnalytics.conversionRate}</strong>
               </div>
             </div>
           </article>
@@ -459,15 +506,15 @@ function AdminPanel(props) {
             </div>
             <div className="task-list">
               <button type="button" onClick={() => setAdminTab('bookings')}>
-                <span>{adminData.overview?.pending.bookings}</span>
+                <span>{overviewPending.bookings}</span>
                 New orders
               </button>
               <button type="button" onClick={() => setAdminTab('inquiries')}>
-                <span>{adminData.overview?.pending.inquiries}</span>
+                <span>{overviewPending.inquiries}</span>
                 Customer messages
               </button>
               <button type="button" onClick={() => setAdminTab('reviews')}>
-                <span>{adminData.overview?.pending.reviews}</span>
+                <span>{overviewPending.reviews}</span>
                 Review queue
               </button>
             </div>
@@ -612,18 +659,16 @@ function AdminPanel(props) {
 
       {adminSession.user ? (
         <div className="admin-tabs">
-          {adminTabs
-            .filter((tab) => tab.id !== 'superadmin' || adminSession.user?.role === 'superadmin')
-            .map((tab) => (
-              <button
-                className={adminTab === tab.id ? 'is-active' : ''}
-                key={tab.id}
-                type="button"
-                onClick={() => setAdminTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {visibleAdminTabs.map((tab) => (
+            <button
+              className={adminTab === tab.id ? 'is-active' : ''}
+              key={tab.id}
+              type="button"
+              onClick={() => setAdminTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       ) : null}
 

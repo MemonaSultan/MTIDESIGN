@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useState } from 'react';
 import './App.css';
 import { bookingDefaults, inquiryDefaults } from './siteContent';
 import { fallbackSiteState } from './fallbackSiteState';
@@ -6,15 +6,67 @@ import { collectionConfigs, navigation } from './adminConfig';
 import PublicSite from './PublicSite';
 import AdminPanel from './AdminPanel';
 import UserPortal from './UserPortal';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from './firebase';
 
-const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
-const publicUrl = process.env.PUBLIC_URL || '';
-const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+// Firebase Modules standard imports
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { 
+  collection, doc, setDoc, addDoc, getDocs, getDoc, deleteDoc, query 
+} from 'firebase/firestore'; 
+
+// Humaray apnay config exports
+import { auth, googleProvider, db } from './firebase';
+
 const authStorageKey = 'mti-admin-session';
 const userStorageKey = 'mti-user-session';
+const staffStorageKey = 'mti-staff-accounts';
+const defaultAdminEmail = 'admin@mtiinteriors.com';
+const defaultAdminPassword = 'Admin123!';
+const defaultAdminContent = {
+  home: fallbackSiteState.home,
+  about: fallbackSiteState.about,
+  contact: fallbackSiteState.contact,
+};
+const defaultAdminSettings = {
+  appName: 'MTI Interiors',
+  maintenanceMode: false,
+  seo: {
+    siteTitle: 'MTI Professional Interiors and Decor',
+    keywords: 'interior design, decor, furniture, Pakistan',
+    metaDescription: 'Premium interior design, decor, consultation, and catalog services from MTI.',
+  },
+  appearance: {
+    primaryColor: '#2f1b12',
+    accentColor: '#c6954f',
+  },
+  security: {
+    recoveryEmail: defaultAdminEmail,
+  },
+};
 
+function normalizeAdminContent(content = {}) {
+  return {
+    home: {
+      ...defaultAdminContent.home,
+      ...(content.home || {}),
+      hero: { ...defaultAdminContent.home.hero, ...(content.home?.hero || content.hero || {}) },
+      offer: { ...defaultAdminContent.home.offer, ...(content.home?.offer || content.offer || {}) },
+    },
+    about: { ...defaultAdminContent.about, ...(content.about || {}) },
+    contact: { ...defaultAdminContent.contact, ...(content.contact || {}) },
+  };
+}
+
+function normalizeAdminSettings(settings = {}) {
+  return {
+    ...defaultAdminSettings,
+    ...settings,
+    seo: { ...defaultAdminSettings.seo, ...(settings.seo || {}) },
+    appearance: { ...defaultAdminSettings.appearance, ...(settings.appearance || {}) },
+    security: { ...defaultAdminSettings.security, ...(settings.security || {}) },
+  };
+}
+
+const publicUrl = process.env.PUBLIC_URL || '';
 const brandAssets = {
   banner: `${publicUrl}/brand/a1.jpeg`,
   letterhead: `${publicUrl}/brand/a2.jpeg`,
@@ -41,9 +93,12 @@ function App() {
   const [bookingForm, setBookingForm] = useState(bookingDefaults);
   const [inquiryForm, setInquiryForm] = useState(inquiryDefaults);
   const [statusMessage, setStatusMessage] = useState({ booking: '', inquiry: '' });
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+
   const [adminAuth, setAdminAuth] = useState({
-    email: 'admin@mtiinteriors.com',
-    password: 'Admin123!',
+    email: '',
+    password: '',
     currentPassword: '',
     newPassword: '',
   });
@@ -51,13 +106,14 @@ function App() {
   const [userSession, setUserSession] = useState({ token: '', user: null });
   const [userAuth, setUserAuth] = useState({
     name: '',
-    email: 'sara@example.com',
+    email: '',
     phone: '',
-    password: 'Client123!',
+    password: '',
   });
   const [userProfile, setUserProfile] = useState({ name: '', phone: '' });
   const [userFeedback, setUserFeedback] = useState({});
   const [adminTab, setAdminTab] = useState('overview');
+
   const [adminData, setAdminData] = useState({
     overview: null,
     users: [],
@@ -67,16 +123,13 @@ function App() {
     bookings: [],
     inquiries: [],
     reviews: [],
-    content: {
-      home: fallbackSiteState.home,
-      about: fallbackSiteState.about,
-      contact: fallbackSiteState.contact,
-    },
+    content: defaultAdminContent,
     blogs: [],
     notifications: [],
-    settings: null,
+    settings: defaultAdminSettings,
     report: null,
   });
+
   const [adminDrafts, setAdminDrafts] = useState(
     Object.fromEntries(
       Object.entries(collectionConfigs).map(([key, config]) => [key, config.emptyItem])
@@ -87,109 +140,122 @@ function App() {
 
   const deferredProjectSearch = useDeferredValue(projectSearch);
   const deferredProductSearch = useDeferredValue(productSearch);
-  const googleButtonRef = useRef(null);
 
-  const apiFetch = useCallback(async (path, options = {}) => {
-    const response = await fetch(`${apiBase}${path}`, {
-      method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Request failed');
-    }
-
-    return payload;
-  }, []);
-
-  const handleGoogleCredential = useCallback(async (credential) => {
+  // Helper function to fetch all docs from a collection
+  const fetchCollection = async (collectionName) => {
     try {
-      const result = await apiFetch('/auth/google', {
-        method: 'POST',
-        body: { credential },
+      const q = query(collection(db, collectionName));
+      const querySnapshot = await getDocs(q);
+      const items = [];
+      querySnapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() });
       });
-      if (result.user.role !== 'user') {
-        throw new Error('Google sign-in is only available for client accounts.');
-      }
-      const session = { token: result.token, user: result.user };
-      setUserSession(session);
-      setUserProfile({ name: result.user.name || '', phone: result.user.phone || '' });
-      setViewMode('account');
-      window.localStorage.setItem(userStorageKey, JSON.stringify(session));
-      setAuthPanelOpen(false);
-    } catch (error) {
-      setUserFeedback((current) => ({ ...current, auth: error.message }));
+      return items;
+    } catch (e) {
+      console.error(`Error fetching collection ${collectionName}:`, e);
+      return [];
     }
-  }, [apiFetch, setUserSession, setUserProfile, setViewMode, setAuthPanelOpen, setUserFeedback]);
+  };
 
-  const loadAdminWorkspace = useCallback(async (token) => {
+  // Direct Firebase Admin Workspace Loader
+  const loadAdminWorkspace = useCallback(async () => {
     setAdminLoading(true);
     try {
       const [
-        overview,
-        usersPayload,
-        servicesPayload,
-        projectsPayload,
-        productsPayload,
-        bookingsPayload,
-        inquiriesPayload,
-        reviewsPayload,
-        contentPayload,
-        blogsPayload,
-        notificationsPayload,
-        settingsPayload,
+        usersList, servicesList, projectsList, productsList,
+        bookingsList, inquiriesList, reviewsList, blogsList, notificationsList
       ] = await Promise.all([
-        apiFetch('/admin/overview', { token }),
-        apiFetch('/admin/users', { token }),
-        apiFetch('/admin/services', { token }),
-        apiFetch('/admin/projects', { token }),
-        apiFetch('/admin/products', { token }),
-        apiFetch('/admin/bookings', { token }),
-        apiFetch('/admin/inquiries', { token }),
-        apiFetch('/admin/reviews', { token }),
-        apiFetch('/admin/content', { token }),
-        apiFetch('/admin/blogs', { token }),
-        apiFetch('/admin/notifications', { token }),
-        apiFetch('/admin/settings', { token }),
+        fetchCollection('users'),
+        fetchCollection('services'),
+        fetchCollection('projects'),
+        fetchCollection('products'),
+        fetchCollection('bookings'),
+        fetchCollection('inquiries'),
+        fetchCollection('reviews'),
+        fetchCollection('blogs'),
+        fetchCollection('notifications')
       ]);
 
+      let contentData = defaultAdminContent;
+      const contentDoc = await getDoc(doc(db, 'config', 'content'));
+      if (contentDoc.exists()) contentData = normalizeAdminContent(contentDoc.data());
+
+      let settingsData = defaultAdminSettings;
+      const settingsDoc = await getDoc(doc(db, 'config', 'settings'));
+      if (settingsDoc.exists()) settingsData = normalizeAdminSettings(settingsDoc.data());
+
+      const overviewStats = {
+        totalUsers: usersList.length,
+        totalBookings: bookingsList.length,
+        totalInquiries: inquiriesList.length,
+        totalProjects: projectsList.length,
+        pendingBookings: bookingsList.filter(b => b.status === 'pending').length
+      };
+      const localStaffAccounts = getLocalStaffAccounts().map(({ password, ...account }) => account);
+      const defaultSuperAdmin = {
+        id: 'default-superadmin',
+        name: 'Super Admin',
+        email: defaultAdminEmail,
+        phone: '',
+        role: 'superadmin',
+        status: 'active',
+      };
+      const mergedUsers = [defaultSuperAdmin, ...localStaffAccounts, ...usersList].filter(
+        (user, index, list) => index === list.findIndex((item) => item.email === user.email || item.id === user.id)
+      );
+
       setAdminData({
-        overview,
-        users: usersPayload.users,
-        services: servicesPayload.services,
-        projects: projectsPayload.projects,
-        products: productsPayload.products,
-        bookings: bookingsPayload.bookings,
-        inquiries: inquiriesPayload.inquiries,
-        reviews: reviewsPayload.reviews,
-        content: contentPayload.content,
-        blogs: blogsPayload.blogs,
-        notifications: notificationsPayload.notifications,
-        settings: settingsPayload,
+        overview: overviewStats,
+        users: mergedUsers,
+        services: servicesList,
+        projects: projectsList,
+        products: productsList,
+        bookings: bookingsList,
+        inquiries: inquiriesList,
+        reviews: reviewsList,
+        content: contentData,
+        blogs: blogsList,
+        notifications: notificationsList,
+        settings: settingsData,
         report: null,
       });
+    } catch (error) {
+      console.error("Failed to load admin workspace from Firebase", error);
     } finally {
       setAdminLoading(false);
     }
-  }, [apiFetch]);
+  }, []);
 
+  // Public Sync Initial Check
   useEffect(() => {
-    apiFetch('/site/public')
-      .then((payload) => setSiteData((current) => ({ ...current, ...payload })))
-      .catch(() => {});
+    const loadPublicData = async () => {
+      const projectsList = await fetchCollection('projects');
+      const productsList = await fetchCollection('products');
+      const servicesList = await fetchCollection('services');
+      const reviewsList = await fetchCollection('reviews');
+      const blogsList = await fetchCollection('blogs');
+
+      const contentDoc = await getDoc(doc(db, 'config', 'content'));
+      const contentData = contentDoc.exists() ? normalizeAdminContent(contentDoc.data()) : defaultAdminContent;
+
+      setSiteData({
+        ...fallbackSiteState,
+        ...contentData,
+        projects: projectsList,
+        products: productsList,
+        services: servicesList,
+        reviews: reviewsList.filter(r => r.approved === true),
+        blogs: blogsList.filter(b => b.published !== false),
+      });
+    };
+
+    loadPublicData().catch(err => console.log("Public state load failure", err));
 
     const storedAdmin = window.localStorage.getItem(authStorageKey);
     if (storedAdmin) {
       try {
         const parsed = JSON.parse(storedAdmin);
-        if (parsed.token && (parsed.user?.role === 'admin' || parsed.user?.role === 'superadmin')) {
-          setAdminSession(parsed);
-        }
+        if (parsed.token) setAdminSession(parsed);
       } catch (error) {
         window.localStorage.removeItem(authStorageKey);
       }
@@ -199,7 +265,7 @@ function App() {
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
-        if (parsed.token && parsed.user?.role === 'user') {
+        if (parsed.token) {
           setUserSession(parsed);
           setUserProfile({ name: parsed.user.name || '', phone: parsed.user.phone || '' });
         }
@@ -207,64 +273,24 @@ function App() {
         window.localStorage.removeItem(userStorageKey);
       }
     }
-  }, [apiFetch]);
+  }, []);
 
+  // Admin Workspace Trigger
   useEffect(() => {
-    if (!adminSession.token) {
-      return;
-    }
-
-    loadAdminWorkspace(adminSession.token).catch(() => {
+    if (!adminSession.token) return;
+    loadAdminWorkspace().catch(() => {
       setAdminFeedback((current) => ({ ...current, auth: 'Admin data could not be loaded.' }));
     });
   }, [adminSession.token, loadAdminWorkspace]);
 
+  // Client User Sync
   useEffect(() => {
-    if (!userSession.token) {
-      return;
-    }
-
-    apiFetch('/auth/profile', { token: userSession.token })
-      .then((payload) => {
-        const session = { token: userSession.token, user: payload.user };
-        setUserSession(session);
-        setUserProfile({ name: payload.user.name || '', phone: payload.user.phone || '' });
-        window.localStorage.setItem(userStorageKey, JSON.stringify(session));
-      })
-      .catch(() => {
-        setUserFeedback((current) => ({ ...current, auth: 'Client session could not be refreshed.' }));
-      });
-  }, [apiFetch, userSession.token]);
-
-  useEffect(() => {
-    if (!googleClientId || window.google?.accounts?.id) {
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-  }, []);
-
-  useEffect(() => {
-    if (!authPanelOpen || !googleClientId || !googleButtonRef.current || !window.google?.accounts?.id) {
-      return;
-    }
-
-    googleButtonRef.current.innerHTML = '';
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: (response) => handleGoogleCredential(response.credential),
+    if (!userSession.token || !auth.currentUser) return;
+    setUserProfile({
+      name: auth.currentUser.displayName || userProfile.name || 'Client',
+      phone: userProfile.phone || '',
     });
-    window.google.accounts.id.renderButton(googleButtonRef.current, {
-      theme: 'outline',
-      size: 'large',
-      width: 320,
-      text: 'continue_with',
-    });
-  }, [authPanelOpen, handleGoogleCredential]);
+  }, [userSession.token, userProfile.name, userProfile.phone]);
 
   function openAuthPanel(mode = 'login') {
     setAuthMode(mode);
@@ -276,134 +302,215 @@ function App() {
     setAuthPanelOpen(false);
   }
 
-  const handleUserSignUp = async (email, password) => {
+  function isDefaultAdminLogin(email, password) {
+    return email.trim().toLowerCase() === defaultAdminEmail && password === defaultAdminPassword;
+  }
+
+  function getLocalStaffAccounts() {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      alert("User Registered via Firebase Successfully!");
+      const stored = window.localStorage.getItem(staffStorageKey);
+      return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      alert("Firebase Signup Error: " + error.message);
-      throw error;
-    }
-  };
-
-  const handleUserLogin = async (email, password) => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      alert("User Authenticated via Firebase!");
-    } catch (error) {
-      alert("Firebase Login Error: " + error.message);
-      throw error;
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      // Force account selection taake browser ghalati se purana ya disabled session auto-select na kare
-      googleProvider.setCustomParameters({
-        prompt: 'select_account'
-      });
-
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      
-      const idToken = await user.getIdToken();
-      
-      const syncResult = await apiFetch('/auth/login', {
-        method: 'POST',
-        body: { email: user.email, isGoogleAuth: true, firebaseToken: idToken }
-      }).catch(async () => {
-        return await apiFetch('/auth/register', {
-          method: 'POST',
-          body: { name: user.displayName, email: user.email, password: 'GoogleVerifiedBypass123!', role: 'user' }
-        }).then(() => apiFetch('/auth/login', {
-          method: 'POST',
-          body: { email: user.email, isGoogleAuth: true }
-        }));
-      });
-
-      const session = { token: syncResult.token, user: syncResult.user };
-      setUserSession(session);
-      setUserProfile({ name: syncResult.user.name || user.displayName || '', phone: syncResult.user.phone || '' });
-      
-      // Modal panel ko close karein aur seedha home site par redirect karein
-      setViewMode('site');
-      window.localStorage.setItem(userStorageKey, JSON.stringify(session));
-      setAuthPanelOpen(false);
-      
-      alert(`Welcome ${user.displayName}! Google Sign-In Successful.`);
-    } catch (error) {
-      alert("Google Auth Error: " + error.message);
-      setUserFeedback((current) => ({ ...current, auth: error.message }));
-    }
-  };
-async function handleUserAuthSubmit(event) {
-    event.preventDefault();
-    setUserFeedback((current) => ({ ...current, auth: '' })); // Pehle wale errors clear karein
-    
-    try {
-      const credentials = { email: userAuth.email, password: userAuth.password };
-
-      if (authMode === 'register') {
-        // 1. Firebase par user register karein
-        try {
-          await handleUserSignUp(userAuth.email, userAuth.password);
-        } catch (fbErr) {
-          console.log("Firebase signup handled or already exists", fbErr);
-        }
-        
-        // 2. Apne Node.js backend par user register karein
-        await apiFetch('/auth/register', {
-          method: 'POST',
-          body: {
-            name: userAuth.name,
-            email: userAuth.email,
-            phone: userAuth.phone,
-            password: userAuth.password,
-          },
-        });
-      }
-
-      // 3. Backend par login karwein token lene ke liye
-      const result = await apiFetch('/auth/login', {
-        method: 'POST',
-        body: credentials,
-      });
-
-      // 4. Firebase par sign in confirm karein
-      try {
-        await handleUserLogin(userAuth.email, userAuth.password);
-      } catch (fbLogErr) {
-        console.log("Firebase login bypass/handled", fbLogErr);
-      }
-
-      const session = { token: result.token, user: result.user };
-
-      if (result.user.role === 'admin' || result.user.role === 'superadmin') {
-        setAdminSession(session);
-        setViewMode('admin');
-        window.localStorage.setItem(authStorageKey, JSON.stringify(session));
-        setAdminFeedback((current) => ({ ...current, auth: 'Admin login successful.' }));
-      } else {
-        setUserSession(session);
-        setUserProfile({ name: result.user.name || '', phone: result.user.phone || '' });
-        setViewMode('site'); // Home page par bhejne ke liye
-        window.localStorage.setItem(userStorageKey, JSON.stringify(session));
-        setUserFeedback((current) => ({ ...current, auth: 'Client login successful.' }));
-      }
-      
-      // Har haal mein panel ko close karein agar backend success de chuka hai
-      setAuthPanelOpen(false); 
-      
-    } catch (error) {
-      // Agar error aaye toh usey state mein set karein taake user ko saaf dikhe
-      setUserFeedback((current) => ({ ...current, auth: error.message }));
+      window.localStorage.removeItem(staffStorageKey);
+      return [];
     }
   }
+
+  function saveLocalStaffAccounts(accounts) {
+    window.localStorage.setItem(staffStorageKey, JSON.stringify(accounts));
+  }
+
+  function buildAdminSession(account) {
+    const session = {
+      token: `local-${account.role}-session`,
+      user: {
+        id: account.id,
+        name: account.name,
+        email: account.email,
+        role: account.role,
+        phone: account.phone || '',
+      },
+    };
+
+    window.localStorage.removeItem(userStorageKey);
+    window.localStorage.setItem(authStorageKey, JSON.stringify(session));
+    setUserSession({ token: '', user: null });
+    setAdminSession(session);
+    setAdminFeedback((current) => ({ ...current, auth: '' }));
+    setAuthPanelOpen(false);
+    setViewMode('admin');
+    return session;
+  }
+
+  function openDefaultAdminSession() {
+    return buildAdminSession({
+      id: 'default-superadmin',
+      name: 'Super Admin',
+      email: defaultAdminEmail,
+      role: 'superadmin',
+      phone: '',
+    });
+  }
+
+  function findLocalStaffLogin(email, password) {
+    const loginEmail = email.trim().toLowerCase();
+    return getLocalStaffAccounts().find((account) =>
+      account.email?.trim().toLowerCase() === loginEmail &&
+      account.password === password &&
+      account.status !== 'suspended' &&
+      ['admin', 'superadmin'].includes(account.role)
+    );
+  }
+
+  function upsertLocalStaffAccount(account) {
+    const email = account.email.trim().toLowerCase();
+    const accounts = getLocalStaffAccounts().filter(
+      (item) => item.email?.trim().toLowerCase() !== email && item.id !== account.id
+    );
+    saveLocalStaffAccounts([{ ...account, email }, ...accounts]);
+  }
+
+  function showSiteSection(sectionId) {
+    setViewMode('site');
+    setMobileMenuOpen(false);
+    window.setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }
+
+  function getFriendlyAuthError(error) {
+    const messageMap = {
+      'auth/email-already-in-use': 'An account already exists with this email. Please sign in instead.',
+      'auth/invalid-credential': 'The email or password is incorrect. Please check and try again.',
+      'auth/invalid-email': 'Please enter a valid email address.',
+      'auth/missing-password': 'Please enter your password.',
+      'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
+      'auth/user-not-found': 'No account was found for this email. You can create one below.',
+      'auth/weak-password': 'Please use a stronger password with at least 6 characters.',
+      'auth/wrong-password': 'The password is incorrect. Please try again.',
+      'mti/not-admin': 'This account is a client account. Please use an admin email and password for the admin panel.',
+    };
+
+    return messageMap[error?.code] || 'Sign in could not be completed. Please try again.';
+  }
+
+  async function routeSignedInUser(firebaseUser, profileFallback = {}, options = {}) {
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    const savedProfile = userDoc.exists() ? userDoc.data() : {};
+    const role = savedProfile.role || profileFallback.role || 'user';
+    const isAdminAccount = role === 'admin' || role === 'superadmin';
+
+    if (options.requireAdmin && !isAdminAccount) {
+      const error = new Error('This account is not assigned an admin role.');
+      error.code = 'mti/not-admin';
+      throw error;
+    }
+
+    const name = savedProfile.name || profileFallback.name || firebaseUser.displayName || 'Client';
+    const phone = savedProfile.phone || profileFallback.phone || firebaseUser.phoneNumber || '';
+    const session = {
+      token: await firebaseUser.getIdToken(),
+      user: {
+        id: firebaseUser.uid,
+        name: isAdminAccount ? name || 'Admin Account' : name,
+        email: firebaseUser.email,
+        role,
+        phone,
+      },
+    };
+
+    window.localStorage.removeItem(authStorageKey);
+    window.localStorage.removeItem(userStorageKey);
+
+    if (isAdminAccount) {
+      setAdminSession(session);
+      setUserSession({ token: '', user: null });
+      setViewMode('admin');
+      window.localStorage.setItem(authStorageKey, JSON.stringify(session));
+    } else {
+      setUserSession(session);
+      setAdminSession({ token: '', user: null });
+      setUserProfile({ name, phone });
+      setViewMode('account');
+      window.localStorage.setItem(userStorageKey, JSON.stringify(session));
+    }
+
+    setAdminFeedback((current) => ({ ...current, auth: '' }));
+    setAuthPanelOpen(false);
+    return session;
+  }
+
+  // Google Authentication Integration
+  const handleGoogleSignIn = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
+    try {
+      window.localStorage.removeItem(authStorageKey);
+      window.localStorage.removeItem(userStorageKey);
+      setUserFeedback((current) => ({ ...current, auth: '' }));
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, googleProvider);
+      await routeSignedInUser(result.user, {
+        name: result.user.displayName || 'MTI Client',
+        phone: result.user.phoneNumber || '',
+      });
+    } catch (error) {
+      if (!['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(error.code)) {
+        setUserFeedback((current) => ({ ...current, auth: 'Google Sign-In failed.' }));
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // User Email Password Flow
+  async function handleUserAuthSubmit(event) {
+    event.preventDefault();
+    if (authSubmitting) return;
+    setAuthSubmitting(true);
+    setUserFeedback((current) => ({ ...current, auth: '' }));
+    try {
+      let userCredential;
+      if (authMode === 'register') {
+        userCredential = await createUserWithEmailAndPassword(auth, userAuth.email, userAuth.password);
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          name: userAuth.name,
+          phone: userAuth.phone,
+          email: userAuth.email,
+          role: 'user',
+          createdAt: new Date().toISOString()
+        });
+        alert('Registration Successful!');
+      } else {
+        if (isDefaultAdminLogin(userAuth.email, userAuth.password)) {
+          openDefaultAdminSession();
+          return;
+        }
+        const localStaffAccount = findLocalStaffLogin(userAuth.email, userAuth.password);
+        if (localStaffAccount) {
+          buildAdminSession(localStaffAccount);
+          return;
+        }
+        userCredential = await signInWithEmailAndPassword(auth, userAuth.email, userAuth.password);
+      }
+
+      await routeSignedInUser(userCredential.user, {
+        name: userAuth.name || 'Client',
+        phone: userAuth.phone || '',
+        role: authMode === 'register' ? 'user' : undefined,
+      });
+    } catch (error) {
+      setUserFeedback((current) => ({ ...current, auth: getFriendlyAuthError(error) }));
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  // Action Logout Process
   async function handleUserLogout() {
     try {
-      if (userSession.token) {
-        await apiFetch('/auth/logout', { method: 'POST', token: userSession.token });
-      }
+      if (auth.currentUser) await auth.signOut();
     } finally {
       setUserSession({ token: '', user: null });
       setUserProfile({ name: '', phone: '' });
@@ -412,26 +519,41 @@ async function handleUserAuthSubmit(event) {
     }
   }
 
+  // Update Client Profile Record 
   async function handleProfileSave(event) {
     event.preventDefault();
     try {
-      const result = await apiFetch('/auth/profile', {
-        method: 'PATCH',
-        token: userSession.token,
-        body: userProfile,
-      });
-      const session = { token: userSession.token, user: result.user };
-      setUserSession(session);
-      setUserProfile({ name: result.user.name || '', phone: result.user.phone || '' });
-      window.localStorage.setItem(userStorageKey, JSON.stringify(session));
-      setUserFeedback((current) => ({ ...current, profile: 'Profile updated.' }));
+      const currentUser = auth.currentUser;
+      const sessionUser = userSession.user;
+      const userId = currentUser?.uid || sessionUser?.id;
+      const userEmail = currentUser?.email || sessionUser?.email;
+      if (!userId) throw new Error("No active user configuration session found.");
+
+      await setDoc(doc(db, "users", userId), {
+        name: userProfile.name,
+        phone: userProfile.phone,
+        email: userEmail,
+        role: sessionUser?.role || 'user',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      const updatedSession = {
+        ...userSession,
+        user: { ...userSession.user, name: userProfile.name, phone: userProfile.phone }
+      };
+      setUserSession(updatedSession);
+      window.localStorage.setItem(userStorageKey, JSON.stringify(updatedSession));
+      alert('Profile saved successfully in Firebase Firestore!');
     } catch (error) {
       setUserFeedback((current) => ({ ...current, profile: error.message }));
     }
   }
 
+  // Balanced single-click input handler without immediate state-clearing race conditions
   function updateObjectForm(setter) {
-    return ({ target: { name, value } }) => setter((current) => ({ ...current, [name]: value }));
+    return ({ target: { name, value } }) => {
+      setter((current) => ({ ...current, [name]: value }));
+    };
   }
 
   function syncPublicState(resourceKey, items) {
@@ -451,10 +573,7 @@ async function handleUserAuthSubmit(event) {
   function setDraftValue(resourceKey, field, value) {
     setAdminDrafts((current) => ({
       ...current,
-      [resourceKey]: {
-        ...current[resourceKey],
-        [field]: value,
-      },
+      [resourceKey]: { ...current[resourceKey], [field]: value },
     }));
   }
 
@@ -468,68 +587,107 @@ async function handleUserAuthSubmit(event) {
     }));
   }
 
+  // Booking Form Submit Logic (With instant state-locking feedback)
   async function handleBookingSubmit(event) {
     event.preventDefault();
     try {
-      const result = await apiFetch('/bookings', { method: 'POST', body: bookingForm });
-      setStatusMessage((current) => ({ ...current, booking: `Booking request ${result.booking.reference} submitted successfully.` }));
+      const bookingRef = 'MTI-' + Math.floor(100000 + Math.random() * 900000);
+      const finalBookingData = {
+        ...bookingForm,
+        reference: bookingRef,
+        createdAt: new Date().toISOString(),
+        status: 'pending'
+      };
+
+      await addDoc(collection(db, 'bookings'), finalBookingData);
+
+      setStatusMessage({
+        booking: `Booking request ${bookingRef} submitted successfully!`,
+        inquiry: ''
+      });
       setBookingForm(bookingDefaults);
+
+      setTimeout(() => {
+        setStatusMessage((current) => ({ ...current, booking: '' }));
+      }, 5000);
     } catch (error) {
-      setStatusMessage((current) => ({ ...current, booking: error.message }));
+      setStatusMessage((current) => ({ ...current, booking: 'Error: ' + error.message }));
     }
   }
 
+  // Inquiry Form Submit Logic (With instant single-click dispatch)
   async function handleInquirySubmit(event) {
     event.preventDefault();
     try {
-      const result = await apiFetch('/inquiries', { method: 'POST', body: inquiryForm });
-      setStatusMessage((current) => ({ ...current, inquiry: `Inquiry ${result.inquiry.id} sent successfully.` }));
+      const finalInquiryData = { ...inquiryForm, createdAt: new Date().toISOString() };
+      
+      await addDoc(collection(db, 'inquiries'), finalInquiryData);
+
+      setStatusMessage({
+        booking: '',
+        inquiry: 'Inquiry sent successfully!'
+      });
       setInquiryForm(inquiryDefaults);
+
+      setTimeout(() => {
+        setStatusMessage((current) => ({ ...current, inquiry: '' }));
+      }, 5000);
     } catch (error) {
-      setStatusMessage((current) => ({ ...current, inquiry: error.message }));
+      setStatusMessage((current) => ({ ...current, inquiry: 'Error: ' + error.message }));
     }
   }
 
-  async function handleAdminLogin(event) {
-    event.preventDefault();
-    try {
-      const adminCredential = await signInWithEmailAndPassword(
-        auth,
-        adminAuth.email,
-        adminAuth.password
-      );
+  // Admin Account Logins
+ // Updated Admin Login Jo Dono Admins Ko Handle Karega
+async function handleAdminLogin(event) {
+  event.preventDefault();
+  setAdminFeedback((current) => ({ ...current, auth: '' }));
+  
+  // Hum check karenge ke input mein kaunsi email enter ki gayi hai
+  const enteredEmail = adminAuth.email.trim().toLowerCase();
 
-      const user = adminCredential.user;
-      const session = {
-        token: await user.getIdToken(),
-        user: {
-          id: user.uid,
-          name: user.displayName || 'Admin',
-          email: user.email,
-          role: 'admin',
-        },
-      };
+  // Dono allowed admin emails ki list
+  const allowedAdmins = ['admin@mtiinteriors.com', 'superadmin@mtiinteriors.com'];
 
-      setAdminSession(session);
-      setViewMode('admin');
-      window.localStorage.setItem(authStorageKey, JSON.stringify(session));
-      setAdminFeedback((current) => ({
-        ...current,
-        auth: 'Admin login successful.',
-      }));
-    } catch (error) {
-      setAdminFeedback((current) => ({
-        ...current,
-        auth: error.message,
-      }));
-    }
+  if (!allowedAdmins.includes(enteredEmail)) {
+    setAdminFeedback((current) => ({ 
+      ...current, 
+      auth: 'Access Denied: This email is not registered as an administrator.' 
+    }));
+    return;
   }
+
+  try {
+    // Firebase Auth se sign in
+    const adminCredential = await signInWithEmailAndPassword(auth, adminAuth.email, adminAuth.password);
+    const user = adminCredential.user;
+    
+    // Role aur Name decide karna email ke mutabiq
+    const isAdminMti = enteredEmail === 'admin@mtiinteriors.com';
+    const adminRole = isAdminMti ? 'admin' : 'superadmin';
+    const adminName = isAdminMti ? 'MTI Admin' : 'Super Admin';
+
+    const session = {
+      token: await user.getIdToken(),
+      user: { 
+        id: user.uid, 
+        name: adminName, 
+        email: user.email, 
+        role: adminRole 
+      },
+    };
+
+    setAdminSession(session);
+    setViewMode('admin'); // Admin Panel open ho jayega
+    window.localStorage.setItem(authStorageKey, JSON.stringify(session));
+  } catch (error) {
+    setAdminFeedback((current) => ({ ...current, auth: error.message }));
+  }
+}
 
   async function handleAdminLogout() {
     try {
-      if (adminSession.token) {
-        await apiFetch('/auth/logout', { method: 'POST', token: adminSession.token });
-      }
+      if (auth.currentUser) await auth.signOut();
     } finally {
       setAdminSession({ token: '', user: null });
       setViewMode('site');
@@ -539,73 +697,101 @@ async function handleUserAuthSubmit(event) {
 
   async function handlePasswordChange(event) {
     event.preventDefault();
-    try {
-      const result = await apiFetch('/auth/change-password', {
-        method: 'POST',
-        token: adminSession.token,
-        body: {
-          currentPassword: adminAuth.currentPassword,
-          newPassword: adminAuth.newPassword,
-        },
-      });
-      setAdminFeedback((current) => ({ ...current, settings: result.message }));
-      setAdminAuth((current) => ({ ...current, currentPassword: '', newPassword: '' }));
-    } catch (error) {
-      setAdminFeedback((current) => ({ ...current, settings: error.message }));
-    }
+    setAdminFeedback((current) => ({ ...current, settings: 'Password changes should be completed in Firebase Authentication for deployed accounts.' }));
   }
 
+  // Direct Admin Create Collection Operations to Firestore
   async function createCollectionItem(resourceKey) {
     const config = collectionConfigs[resourceKey];
     const dataKey = resourceKey === 'superadmin' ? 'users' : resourceKey;
     try {
-      const result = await apiFetch(`/admin/${config.endpoint}`, {
-        method: 'POST',
-        token: adminSession.token,
-        body: adminDrafts[resourceKey],
-      });
-      const created = result[config.responseOne];
-      const nextItems = [created, ...adminData[dataKey]];
+      const itemData = { ...adminDrafts[resourceKey], createdAt: new Date().toISOString() };
+      if (resourceKey === 'superadmin') {
+        if (!itemData.name || !itemData.email) {
+          setAdminFeedback((current) => ({ ...current, superadmin: 'Name and email are required.' }));
+          return;
+        }
+        if (['admin', 'superadmin'].includes(itemData.role) && !itemData.password) {
+          setAdminFeedback((current) => ({ ...current, superadmin: 'Password is required for admin accounts.' }));
+          return;
+        }
+      }
+      const docRef = await addDoc(collection(db, config.collection), itemData);
+      const createdItem = { id: docRef.id, ...itemData };
+      if (resourceKey === 'superadmin' && ['admin', 'superadmin'].includes(createdItem.role)) {
+        upsertLocalStaffAccount(createdItem);
+      }
+
+      const nextItems = [createdItem, ...adminData[dataKey]];
       setAdminData((current) => ({ ...current, [dataKey]: nextItems }));
       syncPublicState(dataKey, nextItems);
       setAdminDrafts((current) => ({ ...current, [resourceKey]: config.emptyItem }));
-      setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} updated.` }));
+      setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} dynamic entry added.` }));
     } catch (error) {
+      if (resourceKey === 'superadmin') {
+        const itemData = {
+          ...adminDrafts.superadmin,
+          id: `local-${Date.now()}`,
+          createdAt: new Date().toISOString(),
+        };
+        if (!itemData.name || !itemData.email) {
+          setAdminFeedback((current) => ({ ...current, superadmin: 'Name and email are required.' }));
+          return;
+        }
+        if (['admin', 'superadmin'].includes(itemData.role) && !itemData.password) {
+          setAdminFeedback((current) => ({ ...current, superadmin: 'Password is required for admin accounts.' }));
+          return;
+        }
+        if (['admin', 'superadmin'].includes(itemData.role)) upsertLocalStaffAccount(itemData);
+        const nextItems = [itemData, ...adminData.users];
+        setAdminData((current) => ({ ...current, users: nextItems }));
+        setAdminDrafts((current) => ({ ...current, superadmin: config.emptyItem }));
+        setAdminFeedback((current) => ({ ...current, superadmin: 'Account created locally for this admin workspace.' }));
+        return;
+      }
       setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));
     }
   }
 
+  // Direct Admin Save / Patch Item Changes inside Firestore
   async function saveCollectionItem(resourceKey, item) {
     const config = collectionConfigs[resourceKey];
     const dataKey = resourceKey === 'superadmin' ? 'users' : resourceKey;
     try {
-      const result = await apiFetch(`/admin/${config.endpoint}/${item.id}`, {
-        method: 'PATCH',
-        token: adminSession.token,
-        body: item,
-      });
-      const updated = result[config.responseOne];
-      const nextItems = adminData[dataKey].map((entry) => (entry.id === updated.id ? updated : entry));
+      const { id, ...cleanData } = item;
+      if (!String(id).startsWith('local-') && id !== 'default-superadmin') {
+        await setDoc(doc(db, config.collection, id), cleanData, { merge: true });
+      }
+      if (resourceKey === 'superadmin' && ['admin', 'superadmin'].includes(item.role)) {
+        const existing = getLocalStaffAccounts().find((account) => account.id === id || account.email === item.email);
+        upsertLocalStaffAccount({ ...existing, ...item, password: item.password || existing?.password || '' });
+      }
+
+      const nextItems = adminData[dataKey].map((entry) => (entry.id === item.id ? item : entry));
       setAdminData((current) => ({ ...current, [dataKey]: nextItems }));
       syncPublicState(dataKey, nextItems);
-      setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} saved.` }));
+      setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} item saved successfully.` }));
     } catch (error) {
       setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));
     }
   }
 
+  // Direct Admin Delete Item Collections matching Document IDs
   async function deleteCollectionItem(resourceKey, itemId) {
-    const config = collectionConfigs[resourceKey];
-    const dataKey = resourceKey === 'superadmin' ? 'users' : resourceKey;
+      const config = collectionConfigs[resourceKey];
+      const dataKey = resourceKey === 'superadmin' ? 'users' : resourceKey;
     try {
-      await apiFetch(`/admin/${config.endpoint}/${itemId}`, {
-        method: 'DELETE',
-        token: adminSession.token,
-      });
+      if (!String(itemId).startsWith('local-') && itemId !== 'default-superadmin') {
+        await deleteDoc(doc(db, config.collection, itemId));
+      }
+      if (resourceKey === 'superadmin') {
+        saveLocalStaffAccounts(getLocalStaffAccounts().filter((account) => account.id !== itemId));
+      }
+
       const nextItems = adminData[dataKey].filter((item) => item.id !== itemId);
       setAdminData((current) => ({ ...current, [dataKey]: nextItems }));
       syncPublicState(dataKey, nextItems);
-      setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} item removed.` }));
+      setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} element permanently deleted.` }));
     } catch (error) {
       setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));
     }
@@ -618,119 +804,118 @@ async function handleUserAuthSubmit(event) {
     }));
   }
 
+  // Direct Admin Save Process for Simple Records (Bookings/Reviews/Inquiries)
   async function saveSimpleRecord(groupKey, endpoint, item) {
     try {
-      const result = await apiFetch(`/admin/${endpoint}/${item.id}`, {
-        method: 'PATCH',
-        token: adminSession.token,
-        body: item,
-      });
-      const responseKeys = { bookings: 'booking', inquiries: 'inquiry', reviews: 'review', users: 'user' };
-      const updated = result[responseKeys[groupKey]];
-      const nextItems = adminData[groupKey].map((entry) => (entry.id === updated.id ? updated : entry));
+      const { id, ...cleanData } = item;
+      await setDoc(doc(db, endpoint, id), cleanData, { merge: true });
+
+      const nextItems = adminData[groupKey].map((entry) => (entry.id === item.id ? item : entry));
       setAdminData((current) => ({ ...current, [groupKey]: nextItems }));
-      if (groupKey === 'reviews') {
-        syncPublicState('reviews', nextItems);
-      }
-      setAdminFeedback((current) => ({ ...current, [groupKey]: 'Changes saved.' }));
+      if (groupKey === 'reviews') syncPublicState('reviews', nextItems);
+      setAdminFeedback((current) => ({ ...current, [groupKey]: 'Record updated in Firebase.' }));
     } catch (error) {
       setAdminFeedback((current) => ({ ...current, [groupKey]: error.message }));
     }
   }
 
+  // Direct Admin Simple Record Deletion Flows
   async function deleteSimpleRecord(groupKey, endpoint, itemId) {
     try {
-      await apiFetch(`/admin/${endpoint}/${itemId}`, {
-        method: 'DELETE',
-        token: adminSession.token,
-      });
+      await deleteDoc(doc(db, endpoint, itemId));
       const nextItems = adminData[groupKey].filter((item) => item.id !== itemId);
       setAdminData((current) => ({ ...current, [groupKey]: nextItems }));
-      if (groupKey === 'reviews') {
-        syncPublicState('reviews', nextItems);
-      }
-      setAdminFeedback((current) => ({ ...current, [groupKey]: 'Item deleted.' }));
+      if (groupKey === 'reviews') syncPublicState('reviews', nextItems);
+      setAdminFeedback((current) => ({ ...current, [groupKey]: 'Record removed.' }));
     } catch (error) {
       setAdminFeedback((current) => ({ ...current, [groupKey]: error.message }));
     }
   }
 
+  // Save Content Management Updates Directly into centralized Firestore Document
   async function saveContent() {
     try {
-      const result = await apiFetch('/admin/content', {
-        method: 'PATCH',
-        token: adminSession.token,
-        body: adminData.content,
-      });
-      setAdminData((current) => ({ ...current, content: result.content }));
+      const nextContent = normalizeAdminContent(adminData.content);
+      await setDoc(doc(db, 'config', 'content'), nextContent, { merge: true });
       setSiteData((current) => ({
         ...current,
-        home: result.content.home,
-        about: result.content.about,
-        contact: result.content.contact,
+        home: nextContent.home,
+        about: nextContent.about,
+        contact: nextContent.contact,
       }));
-      setAdminFeedback((current) => ({ ...current, content: 'Content updated.' }));
+      setAdminData((current) => ({ ...current, content: nextContent }));
+      setAdminFeedback((current) => ({ ...current, content: 'Global public site copy saved to Firestore.' }));
     } catch (error) {
       setAdminFeedback((current) => ({ ...current, content: error.message }));
     }
   }
 
+  // Save Admin Application Settings Directly into Firestore
   async function saveSettings() {
     try {
-      const result = await apiFetch('/admin/settings', {
-        method: 'PATCH',
-        token: adminSession.token,
-        body: adminData.settings,
-      });
-      setAdminData((current) => ({ ...current, settings: result }));
-      setAdminFeedback((current) => ({ ...current, settings: 'Settings updated.' }));
+      const nextSettings = normalizeAdminSettings(adminData.settings);
+      await setDoc(doc(db, 'config', 'settings'), nextSettings, { merge: true });
+      setAdminData((current) => ({ ...current, settings: nextSettings }));
+      setAdminFeedback((current) => ({ ...current, settings: 'System settings synced online.' }));
     } catch (error) {
       setAdminFeedback((current) => ({ ...current, settings: error.message }));
     }
   }
 
-  async function createBackup() {
-    try {
-      const result = await apiFetch('/admin/backups', { method: 'POST', token: adminSession.token });
-      setAdminData((current) => ({
-        ...current,
-        settings: {
-          ...current.settings,
-          backups: [result.backup, ...current.settings.backups],
-          security: { ...current.settings.security, lastBackupAt: result.backup.createdAt },
-        },
-      }));
-      setAdminFeedback((current) => ({ ...current, settings: 'Backup created.' }));
-    } catch (error) {
-      setAdminFeedback((current) => ({ ...current, settings: error.message }));
-    }
+  function createBackup() {
+    const backup = {
+      createdAt: new Date().toISOString(),
+      siteData,
+      adminData: {
+        services: adminData.services,
+        projects: adminData.projects,
+        products: adminData.products,
+        bookings: adminData.bookings,
+        inquiries: adminData.inquiries,
+        reviews: adminData.reviews,
+        blogs: adminData.blogs,
+        notifications: adminData.notifications,
+        content: normalizeAdminContent(adminData.content),
+        settings: normalizeAdminSettings(adminData.settings),
+      },
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `mti-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setAdminFeedback((current) => ({ ...current, settings: 'Backup JSON downloaded.' }));
   }
 
-  async function exportReport(format) {
-    try {
-      const report = await apiFetch(`/admin/reports/export?format=${format}`, { token: adminSession.token });
-      setAdminData((current) => ({ ...current, report }));
-      setAdminFeedback((current) => ({ ...current, reports: `${format.toUpperCase()} report generated.` }));
-    } catch (error) {
-      setAdminFeedback((current) => ({ ...current, reports: error.message }));
-    }
+  function exportReport(format) {
+    const report = {
+      format,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        bookings: adminData.bookings.length,
+        inquiries: adminData.inquiries.length,
+        users: adminData.users.length,
+        projects: adminData.projects.length,
+        products: adminData.products.length,
+        reviews: adminData.reviews.length,
+      },
+    };
+    setAdminData((current) => ({ ...current, report }));
+    setAdminFeedback((current) => ({ ...current, reports: `${format.toUpperCase()} report generated.` }));
   }
 
   const filteredProjects = siteData.projects.filter((project) => {
     const categoryMatch = projectCategory === 'All' || project.category === projectCategory;
     const search = deferredProjectSearch.trim().toLowerCase();
-    if (!search) {
-      return categoryMatch;
-    }
+    if (!search) return categoryMatch;
     return categoryMatch && `${project.title} ${project.description} ${project.location}`.toLowerCase().includes(search);
   });
 
   const filteredProducts = siteData.products.filter((product) => {
     const categoryMatch = productCategory === 'All' || product.category === productCategory;
     const search = deferredProductSearch.trim().toLowerCase();
-    if (!search) {
-      return categoryMatch;
-    }
+    if (!search) return categoryMatch;
     return categoryMatch && `${product.name} ${product.material} ${product.specification}`.toLowerCase().includes(search);
   });
 
@@ -749,24 +934,20 @@ async function handleUserAuthSubmit(event) {
         </div>
       </div>
 
-      {adminSession.user && viewMode === 'site' ? (
+      {adminSession.user && viewMode === 'site' && (
         <div className="admin-floating-toolbar">
           <div className="toolbar-info">
             <span className="toolbar-dot"></span>
             <span><strong>Admin Mode Active</strong> — Logged in as <em>{adminSession.user.name}</em></span>
           </div>
           <div className="toolbar-actions">
-            <button type="button" onClick={() => setViewMode('admin')} className="toolbar-btn primary">
-              Go to Dashboard
-            </button>
-            <button type="button" onClick={handleAdminLogout} className="toolbar-btn secondary">
-              Logout
-            </button>
+            <button type="button" onClick={() => setViewMode('admin')} className="toolbar-btn primary">Go to Dashboard</button>
+            <button type="button" onClick={handleAdminLogout} className="toolbar-btn secondary">Logout</button>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {viewMode !== 'admin' ? (
+      {viewMode !== 'admin' && (
         <header className="site-header">
           <a className="brand-lockup" href="#top">
             <div className="brand-monogram"><span>M</span><span>T</span><span>I</span></div>
@@ -785,188 +966,239 @@ async function handleUserAuthSubmit(event) {
 
           <nav id="primary-navigation" className={`site-nav ${mobileMenuOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
             {navigation.map((item) => (
-              <a href={item.href} key={item.label} onClick={() => setMobileMenuOpen(false)}>{item.label}</a>
+              <a
+                href={item.href}
+                key={item.label}
+                onClick={(event) => {
+                  setMobileMenuOpen(false);
+                  if (viewMode !== 'site' && item.href.startsWith('#')) {
+                    event.preventDefault();
+                    showSiteSection(item.href.slice(1));
+                  }
+                }}
+              >
+                {item.label}
+              </a>
             ))}
           </nav>
 
           <div className="header-actions">
-            {userSession.user ? (
-              <button className="secondary-action header-link-button" type="button" onClick={() => setViewMode('account')}>
-                Client Portal
-              </button>
+            {adminSession.user ? (
+              <button className="secondary-action header-link-button" type="button" onClick={() => setViewMode('admin')}>Admin Dashboard</button>
+            ) : userSession.user ? (
+              <button className="secondary-action header-link-button" type="button" onClick={() => setViewMode('account')}>Client Portal</button>
             ) : (
-              <button className="secondary-action header-link-button" type="button" onClick={() => openAuthPanel('login')}>
-                Sign In
-              </button>
+              <button className="secondary-action header-link-button" type="button" onClick={() => openAuthPanel('login')}>Sign In</button>
             )}
-            <a className="header-cta" href="#consultation">Request a proposal</a>
+            <a
+              className="header-cta"
+              href="#consultation"
+              onClick={(event) => {
+                if (viewMode !== 'site') {
+                  event.preventDefault();
+                  showSiteSection('consultation');
+                }
+              }}
+            >
+              Request a proposal
+            </a>
           </div>
         </header>
-      ) : null}
+      )}
 
       {viewMode === 'site' ? (
         <PublicSite
-          siteData={siteData}
-          brandAssets={brandAssets}
-          projectSearch={projectSearch}
-          setProjectSearch={setProjectSearch}
-          productSearch={productSearch}
-          setProductSearch={setProductSearch}
-          projectCategory={projectCategory}
-          setProjectCategory={setProjectCategory}
-          productCategory={productCategory}
-          setProductCategory={setProductCategory}
-          filteredProjects={filteredProjects}
-          filteredProducts={filteredProducts}
-          currencyFormatter={currencyFormatter}
-          bookingForm={bookingForm}
-          inquiryForm={inquiryForm}
-          updateBookingForm={updateObjectForm(setBookingForm)}
+          siteData={siteData} brandAssets={brandAssets}
+          projectSearch={projectSearch} setProjectSearch={setProjectSearch}
+          productSearch={productSearch} setProductSearch={setProductSearch}
+          projectCategory={projectCategory} setProjectCategory={setProjectCategory}
+          productCategory={productCategory} setProductCategory={setProductCategory}
+          filteredProjects={filteredProjects} filteredProducts={filteredProducts}
+          currencyFormatter={currencyFormatter} bookingForm={bookingForm} inquiryForm={inquiryForm}
+          updateBookingForm={updateObjectForm(setBookingForm)} 
           updateInquiryForm={updateObjectForm(setInquiryForm)}
-          handleBookingSubmit={handleBookingSubmit}
-          handleInquirySubmit={handleInquirySubmit}
+          handleBookingSubmit={handleBookingSubmit} handleInquirySubmit={handleInquirySubmit}
           statusMessage={statusMessage}
         />
       ) : viewMode === 'account' ? (
         <UserPortal
-          siteData={siteData}
-          userSession={userSession}
-          userProfile={userProfile}
-          setUserProfile={setUserProfile}
-          userFeedback={userFeedback}
-          handleProfileSave={handleProfileSave}
+          siteData={siteData} userSession={userSession}
+          userProfile={userProfile} setUserProfile={setUserProfile}
+          userFeedback={userFeedback} handleProfileSave={handleProfileSave}
           handleUserLogout={handleUserLogout}
+          showSiteSection={showSiteSection}
         />
       ) : (
         <AdminPanel
-          adminSession={adminSession}
-          adminAuth={adminAuth}
-          setAdminAuth={setAdminAuth}
-          adminTab={adminTab}
-          setAdminTab={setAdminTab}
-          adminData={adminData}
-          adminDrafts={adminDrafts}
-          adminFeedback={adminFeedback}
-          adminLoading={adminLoading}
-          handleAdminLogin={handleAdminLogin}
-          handleAdminLogout={handleAdminLogout}
-          handlePasswordChange={handlePasswordChange}
-          setDraftValue={setDraftValue}
-          updateCollectionItem={updateCollectionItem}
-          createCollectionItem={createCollectionItem}
-          saveCollectionItem={saveCollectionItem}
-          deleteCollectionItem={deleteCollectionItem}
-          updateSimpleRecord={updateSimpleRecord}
-          saveSimpleRecord={saveSimpleRecord}
-          deleteSimpleRecord={deleteSimpleRecord}
-          saveContent={saveContent}
-          saveSettings={saveSettings}
-          createBackup={createBackup}
-          exportReport={exportReport}
-          setAdminData={setAdminData}
-          setViewMode={setViewMode}
-          viewMode={viewMode}
+          adminSession={adminSession} adminAuth={adminAuth} setAdminAuth={setAdminAuth}
+          adminTab={adminTab} setAdminTab={setAdminTab} adminData={adminData}
+          adminDrafts={adminDrafts} adminFeedback={adminFeedback} adminLoading={adminLoading}
+          handleAdminLogin={handleAdminLogin} handleAdminLogout={handleAdminLogout}
+          handlePasswordChange={handlePasswordChange} setDraftValue={setDraftValue}
+          updateCollectionItem={updateCollectionItem} createCollectionItem={createCollectionItem}
+          saveCollectionItem={saveCollectionItem} deleteCollectionItem={deleteCollectionItem}
+          updateSimpleRecord={updateSimpleRecord} saveSimpleRecord={saveSimpleRecord}
+          deleteSimpleRecord={deleteSimpleRecord} saveContent={saveContent}
+          saveSettings={saveSettings} createBackup={createBackup} exportReport={exportReport}
+          setAdminData={setAdminData} setViewMode={setViewMode} viewMode={viewMode}
         />
       )}
 
-      {authPanelOpen ? (
+      {authPanelOpen && (
         <div className="auth-overlay" role="presentation">
           <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-            <button className="auth-close" type="button" onClick={closeAuthPanel} aria-label="Close login panel">
-              x
-            </button>
-            <div className="auth-modal-copy">
-              <p className="section-tag">Secure Access</p>
-              <h2 id="auth-title">{authMode === 'register' ? 'Create Client Account' : 'Sign In / Portal Login'}</h2>
-              <p>
-                Sign in using your credentials to access either your personalized Client Portal or the MTI Professional Staff Dashboard.
-              </p>
-              <div className="auth-benefits">
-                <span>Track requests</span>
-                <span>Save profile details</span>
-                <span>Manage workspace</span>
+            <button className="auth-close" type="button" onClick={closeAuthPanel} aria-label="Close sign in panel">x</button>
+
+            <div className="auth-split-container">
+
+              {/* LEFT PANEL */}
+              <div className="auth-left-panel">
+                <div className="brand-badge">
+                  <div className="brand-monogram-small">MTI</div>
+                  <span>Client Portal</span>
+                </div>
+                <div className="auth-brand-content">
+                  <h1 className="animated-hero-text">
+                    Your design journey,
+                    <span className="italic-accent"> organized.</span>
+                  </h1>
+                  <p className="brand-subtext">
+                    Sign in to manage consultations, update your contact details, and keep project conversations close at hand.
+                  </p>
+                  <div className="auth-benefit-list" aria-label="Account benefits">
+                    <span>Fast Google or email access</span>
+                    <span>Saved client profile</span>
+                    <span>Easy consultation follow-up</span>
+                  </div>
+                </div>
+                <p className="auth-footer-copy">(c) 2026 MTI Interiors. Made to Inspire.</p>
               </div>
+
+              {/* RIGHT PANEL */}
+              <div className="auth-right-panel">
+                <div className="form-wrapper-animated">
+                  <div className="auth-header-block">
+                    <p className="section-tag">Secure Access</p>
+                    <h2 id="auth-title">{authMode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
+                    <p className="auth-subtitle">
+                      {authMode === 'login'
+                        ? 'Use one login for everyone. Admin accounts open the dashboard, client accounts open the portal.'
+                        : 'Create a client account so MTI can keep your project details in one place.'}
+                    </p>
+                  </div>
+
+                  <div className="auth-mode-tabs" role="tablist" aria-label="Choose sign in mode">
+                    <button
+                      type="button"
+                      className={authMode === 'login' ? 'is-active' : ''}
+                      onClick={() => {
+                        setAuthMode('login');
+                        setUserFeedback({});
+                      }}
+                    >
+                      Sign in
+                    </button>
+                    <button
+                      type="button"
+                      className={authMode === 'register' ? 'is-active' : ''}
+                      onClick={() => {
+                        setAuthMode('register');
+                        setUserFeedback({});
+                      }}
+                    >
+                      Create account
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="google-auth-btn-modern"
+                    onClick={handleGoogleSignIn}
+                    disabled={googleLoading}
+                  >
+                    <img src="https://www.svgrepo.com/show/355037/google-icon.svg" className="google-icon-svg" alt="Google" />
+                    {googleLoading ? 'Opening Google...' : 'Continue with Google'}
+                  </button>
+
+                  <div className="auth-divider-modern">
+                    <span>or email</span>
+                  </div>
+
+                  <form onSubmit={handleUserAuthSubmit} className="auth-form-modern">
+                    {authMode === 'register' && (
+                      <>
+                        <div className="form-field-modern animate-fade-in">
+                          <label>Full Name</label>
+                          <input
+                            type="text"
+                            value={userAuth.name}
+                            onChange={(e) => setUserAuth({ ...userAuth, name: e.target.value })}
+                            required
+                            autoComplete="name"
+                            placeholder="Your full name"
+                          />
+                        </div>
+                        <div className="form-field-modern animate-fade-in">
+                          <label>Phone Number</label>
+                          <input
+                            type="tel"
+                            value={userAuth.phone}
+                            onChange={(e) => setUserAuth({ ...userAuth, phone: e.target.value })}
+                            autoComplete="tel"
+                            placeholder="+92 300 1234567"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="form-field-modern">
+                      <label>Email Address</label>
+                      <input
+                        type="email"
+                        value={userAuth.email}
+                        onChange={(e) => setUserAuth({ ...userAuth, email: e.target.value })}
+                        required
+                        autoComplete="email"
+                        placeholder="you@example.com"
+                      />
+                    </div>
+
+                    <div className="form-field-modern">
+                      <label>Password</label>
+                      <input
+                        type="password"
+                        value={userAuth.password}
+                        onChange={(e) => setUserAuth({ ...userAuth, password: e.target.value })}
+                        required
+                        minLength={authMode === 'register' ? 6 : undefined}
+                        autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                        placeholder={authMode === 'login' ? 'Enter your password' : 'At least 6 characters'}
+                      />
+                    </div>
+
+                    {userFeedback.auth && <p className="auth-error-msg-modern">{userFeedback.auth}</p>}
+
+                    <button type="submit" className="auth-submit-btn-modern" disabled={authSubmitting}>
+                      {authSubmitting
+                        ? 'Please wait...'
+                        : authMode === 'login'
+                          ? 'Sign in'
+                          : 'Create account'}
+                    </button>
+                  </form>
+
+                  <p className="auth-panel-note">
+                    {authMode === 'login'
+                      ? 'New here? Choose Create account above and we will set up your client profile.'
+                      : 'Already registered? Choose Sign in above to continue.'}
+                  </p>
+                </div>
+              </div>
+
             </div>
-            
-            {/* Display authentication context errors/feedbacks if any */}
-            {userFeedback.auth && (
-              <div style={{ color: '#ff3b30', marginBottom: '15px', fontSize: '14px', textAlign: 'center', fontWeight: 'bold' }}>
-                {userFeedback.auth}
-              </div>
-            )}
-
-            <form className="auth-form" onSubmit={handleUserAuthSubmit}>
-              {authMode === 'register' ? (
-                <>
-                  <label className="admin-field">
-                    <span>Name</span>
-                    <input value={userAuth.name} onChange={(event) => setUserAuth((current) => ({ ...current, name: event.target.value }))} />
-                  </label>
-                  <label className="admin-field">
-                    <span>Phone</span>
-                    <input value={userAuth.phone} onChange={(event) => setUserAuth((current) => ({ ...current, phone: event.target.value }))} />
-                  </label>
-                </>
-              ) : null}
-              <label className="admin-field">
-                <span>Email</span>
-                <input
-                  value={userAuth.email}
-                  onChange={(event) => setUserAuth((current) => ({ ...current, email: event.target.value }))}
-                />
-              </label>
-              <label className="admin-field">
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={userAuth.password}
-                  onChange={(event) => setUserAuth((current) => ({ ...current, password: event.target.value }))}
-                />
-              </label>
-              
-              <button type="submit" className="toolbar-btn primary" style={{ width: '100%', marginTop: '10px', padding: '12px' }}>
-                {authMode === 'register' ? 'Register Account' : 'Login Securely'}
-              </button>
-
-              <div style={{ margin: '15px 0', textHighlight: 'none', color: '#888', fontSize: '13px' }}>— OR —</div>
-
-              <div className="google-auth-slot" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', width: '100%' }}>
-                {/* Firebase Popup Google Sign-In Mechanism */}
-                <button 
-                  type="button" 
-                  onClick={handleGoogleSignIn}
-                  style={{
-                    width: '100%',
-                    maxWidth: '320px',
-                    padding: '10px',
-                    backgroundColor: '#4285F4',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                  }}
-                >
-                  Continue with Google
-                </button>
-
-                {/* Legacy script ref slot fallback placeholder if env setup is present */}
-                {googleClientId && <div ref={googleButtonRef} style={{ marginTop: '5px' }} />}
-              </div>
-
-              <div style={{ marginTop: '20px', fontSize: '14px' }}>
-                {authMode === 'register' ? (
-                  <span>Already have an account? <button type="button" onClick={() => setAuthMode('login')} style={{ background: 'none', border: 'none', color: '#007aff', cursor: 'pointer', textDecoration: 'underline' }}>Sign In</button></span>
-                ) : (
-                  <span>New client? <button type="button" onClick={() => setAuthMode('register')} style={{ background: 'none', border: 'none', color: '#007aff', cursor: 'pointer', textDecoration: 'underline' }}>Create an account</button></span>
-                )}
-              </div>
-            </form>
           </section>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

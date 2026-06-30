@@ -8,6 +8,7 @@ function UserPortal({
   userFeedback,
   handleProfileSave,
   handleUserLogout,
+  showSiteSection,
 }) {
   const user = userSession.user || {};
 
@@ -66,7 +67,14 @@ function UserPortal({
           <p className="section-tag">Next Step</p>
           <h3>Book a consultation</h3>
           <p>Share your project details with the studio and we will confirm timing, scope, and material direction.</p>
-          <a className="primary-action" href="#consultation">
+          <a
+            className="primary-action"
+            href="#consultation"
+            onClick={(event) => {
+              event.preventDefault();
+              showSiteSection('consultation');
+            }}
+          >
             Start booking
           </a>
         </article>
