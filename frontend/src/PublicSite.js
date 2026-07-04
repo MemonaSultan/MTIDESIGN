@@ -43,11 +43,6 @@ function PublicSite({
                 Explore projects
               </a>
             </div>
-            <div className="hero-client-bar" aria-label="Client support highlights">
-              <span>Material guidance</span>
-              <span>Transparent estimates</span>
-              <span>Installation support</span>
-            </div>
             <div className="quick-metrics">
               {siteData.home.highlights.map((highlight) => (
                 <article key={highlight.label}>
@@ -79,21 +74,6 @@ function PublicSite({
                 </p>
               </div>
             </article>
-
-            <article className="home-intake-panel">
-              <div>
-                <p className="card-kicker">Start with the right fit</p>
-                <h2>Tell us your room, budget, and material preference.</h2>
-              </div>
-              <div className="mini-service-list">
-                {siteData.services.slice(0, 3).map((service) => (
-                  <a href="#services" key={service.id}>
-                    <span>{service.category}</span>
-                    <strong>{service.name}</strong>
-                  </a>
-                ))}
-              </div>
-            </article>
           </div>
         </section>
 
@@ -108,20 +88,6 @@ function PublicSite({
               <strong>{title}</strong>
               <span>{copy}</span>
             </a>
-          ))}
-        </section>
-
-        <section className="home-process-section" aria-label="Client process">
-          {[
-            ['01', 'Share your brief', 'Send room details, size, photos, and the service you need.'],
-            ['02', 'Review options', 'Compare materials, finishes, timelines, and practical budget direction.'],
-            ['03', 'Confirm execution', 'Finalize measurements, installation support, and delivery schedule.'],
-          ].map(([step, title, copy]) => (
-            <article className="process-card" key={step}>
-              <span>{step}</span>
-              <h3>{title}</h3>
-              <p>{copy}</p>
-            </article>
           ))}
         </section>
 

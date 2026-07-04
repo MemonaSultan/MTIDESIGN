@@ -1,11 +1,11 @@
 export const homeFallback = {
   hero: {
-    title: 'Interior solutions made easier from idea to installation.',
+    title: 'Refined interior solutions for homes, offices, and retail spaces.',
     description:
-      'Explore curated curtains, blinds, wallpapers, flooring, furniture, and styling support with clear guidance, professional estimates, and a showroom-backed experience.',
+      'MTI Interiors and Decor creates elegant curtains, blinds, wallpapers, flooring, furniture, and complete styling with clear guidance and a premium showroom experience.',
   },
   offer: {
-    title: 'Start with a guided design discussion',
+    title: 'Guided design discussion',
     description:
       'Share your room photos, measurements, and preferred style so the MTI team can recommend the right material direction before you commit.',
   },
