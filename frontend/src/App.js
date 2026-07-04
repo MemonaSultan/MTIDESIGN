@@ -33,13 +33,32 @@ const defaultAdminSettings = {
     siteTitle: 'MTI Professional Interiors and Decor',
     keywords: 'interior design, decor, furniture, Pakistan',
     metaDescription: 'Premium interior design, decor, consultation, and catalog services from MTI.',
+    canonicalUrl: '',
+    ogImage: '',
   },
   appearance: {
     primaryColor: '#2f1b12',
     accentColor: '#c6954f',
+    themeMode: 'warm',
+    announcementText: '',
+    showAnnouncement: false,
+  },
+  operations: {
+    timezone: 'Asia/Karachi',
+    currency: 'PKR',
+    businessHours: 'Mon-Sat, 10:00 AM - 8:00 PM',
+    leadResponseTarget: 'Within 24 hours',
+  },
+  notifications: {
+    adminEmail: defaultAdminEmail,
+    whatsappNumber: '+92 321 2323611',
+    bookingAutoReply: true,
+    inquiryAutoReply: true,
   },
   security: {
     recoveryEmail: defaultAdminEmail,
+    sessionTimeout: '8 hours',
+    requireStrongPasswords: true,
   },
 };
 
@@ -62,6 +81,8 @@ function normalizeAdminSettings(settings = {}) {
     ...settings,
     seo: { ...defaultAdminSettings.seo, ...(settings.seo || {}) },
     appearance: { ...defaultAdminSettings.appearance, ...(settings.appearance || {}) },
+    operations: { ...defaultAdminSettings.operations, ...(settings.operations || {}) },
+    notifications: { ...defaultAdminSettings.notifications, ...(settings.notifications || {}) },
     security: { ...defaultAdminSettings.security, ...(settings.security || {}) },
   };
 }
@@ -597,9 +618,17 @@ function App() {
   }
 
   function validateAdminCollectionItem(resourceKey, item, config) {
-    const categoryRequired = ['services', 'projects', 'products'].includes(resourceKey);
+    const categoryRequired = ['services', 'projects', 'products', 'blogs'].includes(resourceKey);
     if (categoryRequired && !item.category) {
       setAdminFeedback((current) => ({ ...current, [resourceKey]: `Please select a category before saving this ${config.title.toLowerCase()} item.` }));
+      return false;
+    }
+    if (resourceKey === 'blogs' && !item.title) {
+      setAdminFeedback((current) => ({ ...current, blogs: 'Please add a blog title before saving.' }));
+      return false;
+    }
+    if (resourceKey === 'notifications' && (!item.title || !item.body)) {
+      setAdminFeedback((current) => ({ ...current, notifications: 'Please add a notification title and body before saving.' }));
       return false;
     }
     return true;

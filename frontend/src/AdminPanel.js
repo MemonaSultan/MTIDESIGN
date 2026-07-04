@@ -186,7 +186,30 @@ function AdminPanel(props) {
   const settings = {
     seo: adminData.settings?.seo || {},
     appearance: adminData.settings?.appearance || {},
+    operations: adminData.settings?.operations || {},
+    notifications: adminData.settings?.notifications || {},
     security: adminData.settings?.security || {},
+  };
+  const updateSettingsGroup = (group, field, value) => {
+    setAdminData((current) => ({
+      ...current,
+      settings: {
+        ...(current.settings || {}),
+        [group]: {
+          ...(current.settings?.[group] || {}),
+          [field]: value,
+        },
+      },
+    }));
+  };
+  const updateSettingsRoot = (field, value) => {
+    setAdminData((current) => ({
+      ...current,
+      settings: {
+        ...(current.settings || {}),
+        [field]: value,
+      },
+    }));
   };
   const recentBookings = adminData.overview?.recentBookings || adminData.bookings.slice(0, 5);
   const recentInquiries = adminData.overview?.recentInquiries || adminData.inquiries.slice(0, 5);
@@ -451,13 +474,65 @@ function AdminPanel(props) {
             </div>
             {adminFeedback.settings ? <span className="admin-feedback">{adminFeedback.settings}</span> : null}
           </div>
-          <div className="admin-form-grid">
-            <FieldControl field={{ label: 'Site title' }} value={settings.seo.siteTitle} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), seo: { ...(current.settings?.seo || {}), siteTitle: value } } }))} />
-            <FieldControl field={{ label: 'Keywords' }} value={settings.seo.keywords} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), seo: { ...(current.settings?.seo || {}), keywords: value } } }))} />
-            <FieldControl field={{ label: 'Meta description', type: 'textarea' }} value={settings.seo.metaDescription} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), seo: { ...(current.settings?.seo || {}), metaDescription: value } } }))} />
-            <FieldControl field={{ label: 'Primary color' }} value={settings.appearance.primaryColor} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), appearance: { ...(current.settings?.appearance || {}), primaryColor: value } } }))} />
-            <FieldControl field={{ label: 'Accent color' }} value={settings.appearance.accentColor} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), appearance: { ...(current.settings?.appearance || {}), accentColor: value } } }))} />
-            <FieldControl field={{ label: 'Recovery email' }} value={settings.security.recoveryEmail} onChange={(value) => setAdminData((current) => ({ ...current, settings: { ...(current.settings || {}), security: { ...(current.settings?.security || {}), recoveryEmail: value } } }))} />
+          <div className="settings-grid">
+            <section className="settings-group">
+              <p className="section-tag">System</p>
+              <div className="admin-form-grid">
+                <FieldControl field={{ label: 'App name' }} value={adminData.settings?.appName} onChange={(value) => updateSettingsRoot('appName', value)} />
+                <FieldControl field={{ label: 'Maintenance mode', type: 'checkbox' }} value={adminData.settings?.maintenanceMode} onChange={(value) => updateSettingsRoot('maintenanceMode', value)} />
+              </div>
+            </section>
+
+            <section className="settings-group">
+              <p className="section-tag">SEO</p>
+              <div className="admin-form-grid">
+                <FieldControl field={{ label: 'Site title' }} value={settings.seo.siteTitle} onChange={(value) => updateSettingsGroup('seo', 'siteTitle', value)} />
+                <FieldControl field={{ label: 'Keywords' }} value={settings.seo.keywords} onChange={(value) => updateSettingsGroup('seo', 'keywords', value)} />
+                <FieldControl field={{ label: 'Canonical URL', type: 'url' }} value={settings.seo.canonicalUrl} onChange={(value) => updateSettingsGroup('seo', 'canonicalUrl', value)} />
+                <FieldControl field={{ label: 'Social Share Image', type: 'image' }} value={settings.seo.ogImage} onChange={(value) => updateSettingsGroup('seo', 'ogImage', value)} />
+                <FieldControl field={{ label: 'Meta description', type: 'textarea' }} value={settings.seo.metaDescription} onChange={(value) => updateSettingsGroup('seo', 'metaDescription', value)} />
+              </div>
+            </section>
+
+            <section className="settings-group">
+              <p className="section-tag">Appearance</p>
+              <div className="admin-form-grid">
+                <FieldControl field={{ label: 'Primary color', type: 'color' }} value={settings.appearance.primaryColor} onChange={(value) => updateSettingsGroup('appearance', 'primaryColor', value)} />
+                <FieldControl field={{ label: 'Accent color', type: 'color' }} value={settings.appearance.accentColor} onChange={(value) => updateSettingsGroup('appearance', 'accentColor', value)} />
+                <FieldControl field={{ label: 'Theme mode', type: 'select', options: ['warm', 'light', 'contrast'] }} value={settings.appearance.themeMode} onChange={(value) => updateSettingsGroup('appearance', 'themeMode', value)} />
+                <FieldControl field={{ label: 'Announcement text' }} value={settings.appearance.announcementText} onChange={(value) => updateSettingsGroup('appearance', 'announcementText', value)} />
+                <FieldControl field={{ label: 'Show announcement', type: 'checkbox' }} value={settings.appearance.showAnnouncement} onChange={(value) => updateSettingsGroup('appearance', 'showAnnouncement', value)} />
+              </div>
+            </section>
+
+            <section className="settings-group">
+              <p className="section-tag">Operations</p>
+              <div className="admin-form-grid">
+                <FieldControl field={{ label: 'Timezone', type: 'select', options: ['Asia/Karachi', 'UTC', 'Asia/Dubai'] }} value={settings.operations.timezone} onChange={(value) => updateSettingsGroup('operations', 'timezone', value)} />
+                <FieldControl field={{ label: 'Currency', type: 'select', options: ['PKR', 'USD', 'AED'] }} value={settings.operations.currency} onChange={(value) => updateSettingsGroup('operations', 'currency', value)} />
+                <FieldControl field={{ label: 'Business hours' }} value={settings.operations.businessHours} onChange={(value) => updateSettingsGroup('operations', 'businessHours', value)} />
+                <FieldControl field={{ label: 'Lead response target' }} value={settings.operations.leadResponseTarget} onChange={(value) => updateSettingsGroup('operations', 'leadResponseTarget', value)} />
+              </div>
+            </section>
+
+            <section className="settings-group">
+              <p className="section-tag">Notifications</p>
+              <div className="admin-form-grid">
+                <FieldControl field={{ label: 'Admin email', type: 'email' }} value={settings.notifications.adminEmail} onChange={(value) => updateSettingsGroup('notifications', 'adminEmail', value)} />
+                <FieldControl field={{ label: 'WhatsApp number' }} value={settings.notifications.whatsappNumber} onChange={(value) => updateSettingsGroup('notifications', 'whatsappNumber', value)} />
+                <FieldControl field={{ label: 'Booking auto reply', type: 'checkbox' }} value={settings.notifications.bookingAutoReply} onChange={(value) => updateSettingsGroup('notifications', 'bookingAutoReply', value)} />
+                <FieldControl field={{ label: 'Inquiry auto reply', type: 'checkbox' }} value={settings.notifications.inquiryAutoReply} onChange={(value) => updateSettingsGroup('notifications', 'inquiryAutoReply', value)} />
+              </div>
+            </section>
+
+            <section className="settings-group">
+              <p className="section-tag">Security</p>
+              <div className="admin-form-grid">
+                <FieldControl field={{ label: 'Recovery email', type: 'email' }} value={settings.security.recoveryEmail} onChange={(value) => updateSettingsGroup('security', 'recoveryEmail', value)} />
+                <FieldControl field={{ label: 'Session timeout', type: 'select', options: ['2 hours', '4 hours', '8 hours', '24 hours'] }} value={settings.security.sessionTimeout} onChange={(value) => updateSettingsGroup('security', 'sessionTimeout', value)} />
+                <FieldControl field={{ label: 'Require strong passwords', type: 'checkbox' }} value={settings.security.requireStrongPasswords} onChange={(value) => updateSettingsGroup('security', 'requireStrongPasswords', value)} />
+              </div>
+            </section>
           </div>
           <div className="admin-actions">
             <button className="primary-action" type="button" onClick={saveSettings}>Save settings</button>

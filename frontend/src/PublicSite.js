@@ -310,9 +310,17 @@ function PublicSite({
           <div className="journal-grid">
             {siteData.blogs.map((blog) => (
               <article className="admin-card journal-card" key={blog.id}>
-                <p className="card-kicker">Published article</p>
+                {blog.coverImage ? <img alt={blog.title} src={blog.coverImage} /> : null}
+                <div className="journal-meta">
+                  <span>{blog.category || 'Published article'}</span>
+                  {blog.readTime ? <span>{blog.readTime}</span> : null}
+                </div>
                 <h3>{blog.title}</h3>
                 <p>{blog.excerpt}</p>
+                <div className="journal-footer">
+                  <span>{blog.author || 'MTI Studio'}</span>
+                  {blog.featured ? <strong>Featured</strong> : null}
+                </div>
               </article>
             ))}
           </div>

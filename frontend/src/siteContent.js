@@ -233,9 +233,16 @@ export const blogFallback = [
   {
     id: 'blog-1',
     title: 'Choosing the right blinds for modern living rooms',
+    category: 'Blinds',
+    author: 'MTI Studio',
+    readTime: '4 min read',
+    tags: 'blinds, living room, sunlight control',
     excerpt:
       'A practical guide to balancing privacy, sunlight control, and interior softness through blind selection.',
+    content:
+      'Focus on fabric opacity, room direction, maintenance needs, and the level of privacy required before selecting a blind system.',
     published: true,
+    featured: true,
   },
 ];
 
