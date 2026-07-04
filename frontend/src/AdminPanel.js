@@ -122,6 +122,10 @@ function AdminPanel(props) {
 
   const selectedTab = adminTabs.find((tab) => tab.id === adminTab);
   const isSuperAdmin = adminSession.user?.role === 'superadmin';
+  const roleName = isSuperAdmin ? 'Super Admin' : 'Admin';
+  const accessSummary = isSuperAdmin
+    ? 'Full access: manage site content, catalog, orders, messages, publishing, reports, settings, staff, and client accounts.'
+    : 'Site manager access: manage content, catalog, orders, messages, reviews, publishing, reports, and settings.';
   const visibleAdminTabs = adminTabs.filter((tab) => {
     if (tab.id === 'superadmin' || tab.id === 'users') return isSuperAdmin;
     return true;
@@ -173,9 +177,9 @@ function AdminPanel(props) {
     body = (
       <section className="admin-login-shell">
         <article className="admin-card auth-card">
-          <p className="section-tag">Admin Authentication</p>
+          <p className="section-tag">Staff Access</p>
           <h2>Staff dashboard login</h2>
-          <p>Use the same email and password login as the public sign-in box. Admin accounts open this dashboard; client accounts open the client portal.</p>
+          <p>Sign in with an admin or super admin account. Admins can manage the site, while super admins also manage staff and client accounts.</p>
           <form className="admin-stack" onSubmit={handleAdminLogin}>
             <label className="admin-field">
               <span>Email</span>
@@ -208,7 +212,7 @@ function AdminPanel(props) {
         <article className="admin-card">
           <p className="section-tag">Super Admin Required</p>
           <h3>Staff and user control is locked</h3>
-          <p>Admins can manage the website, bookings, inquiries, catalog, content, reviews, reports, and settings. Only the superadmin can create admins, suspend users, or delete accounts.</p>
+          <p>Admins can manage the website, bookings, inquiries, catalog, content, reviews, reports, and settings. Only the super admin can create admins, suspend users, or delete accounts.</p>
         </article>
       </section>
     );
@@ -307,8 +311,8 @@ function AdminPanel(props) {
                         <p className="staff-email-sub">{user.email}</p>
                       </div>
                     </div>
-                    <span className={`role-badge badge-${user.role}`}>
-                      {user.role === 'superadmin' ? '👑 Super Admin' : user.role === 'admin' ? '🛠️ Admin' : '👤 Client'}
+              <span className={`role-badge badge-${user.role}`}>
+                      {user.role === 'superadmin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'Client'}
                     </span>
                   </div>
 
@@ -653,23 +657,38 @@ function AdminPanel(props) {
         <div>
           <p className="section-tag">{selectedTab?.label || 'Admin Workspace'}</p>
           <h1>MTI Store Admin</h1>
-          <p>Control the public client site, product catalog, service orders, customer messages, reviews, publishing, users, reports, and settings.</p>
+          <p>{adminSession.user ? accessSummary : 'Sign in with a staff account to manage MTI site operations.'}</p>
         </div>
       </section>
 
       {adminSession.user ? (
-        <div className="admin-tabs">
-          {visibleAdminTabs.map((tab) => (
-            <button
-              className={adminTab === tab.id ? 'is-active' : ''}
-              key={tab.id}
-              type="button"
-              onClick={() => setAdminTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <>
+          <section className="admin-access-strip" aria-label="Admin access level">
+            <article className="admin-card access-card is-active-access">
+              <span className="access-eyebrow">Signed in as</span>
+              <strong>{roleName}</strong>
+              <p>{accessSummary}</p>
+            </article>
+            <article className={`admin-card access-card ${isSuperAdmin ? 'is-active-access' : 'is-locked-access'}`}>
+              <span className="access-eyebrow">Staff & users</span>
+              <strong>{isSuperAdmin ? 'Unlocked' : 'Super admin only'}</strong>
+              <p>{isSuperAdmin ? 'Create admins, update roles, suspend users, and remove accounts.' : 'Site admins can manage the website, but account control stays protected.'}</p>
+            </article>
+          </section>
+
+          <div className="admin-tabs">
+            {visibleAdminTabs.map((tab) => (
+              <button
+                className={adminTab === tab.id ? 'is-active' : ''}
+                key={tab.id}
+                type="button"
+                onClick={() => setAdminTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </>
       ) : null}
 
       {body}

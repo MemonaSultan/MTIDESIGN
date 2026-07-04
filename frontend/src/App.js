@@ -630,52 +630,28 @@ function App() {
   }
 
   // Admin Account Logins
- // Updated Admin Login Jo Dono Admins Ko Handle Karega
-async function handleAdminLogin(event) {
-  event.preventDefault();
-  setAdminFeedback((current) => ({ ...current, auth: '' }));
-  
-  // Hum check karenge ke input mein kaunsi email enter ki gayi hai
-  const enteredEmail = adminAuth.email.trim().toLowerCase();
+  async function handleAdminLogin(event) {
+    event.preventDefault();
+    setAdminFeedback((current) => ({ ...current, auth: '' }));
 
-  // Dono allowed admin emails ki list
-  const allowedAdmins = ['admin@mtiinteriors.com', 'superadmin@mtiinteriors.com'];
+    if (isDefaultAdminLogin(adminAuth.email, adminAuth.password)) {
+      openDefaultAdminSession();
+      return;
+    }
 
-  if (!allowedAdmins.includes(enteredEmail)) {
-    setAdminFeedback((current) => ({ 
-      ...current, 
-      auth: 'Access Denied: This email is not registered as an administrator.' 
-    }));
-    return;
+    const localStaffAccount = findLocalStaffLogin(adminAuth.email, adminAuth.password);
+    if (localStaffAccount) {
+      buildAdminSession(localStaffAccount);
+      return;
+    }
+
+    try {
+      const adminCredential = await signInWithEmailAndPassword(auth, adminAuth.email, adminAuth.password);
+      await routeSignedInUser(adminCredential.user, {}, { requireAdmin: true });
+    } catch (error) {
+      setAdminFeedback((current) => ({ ...current, auth: getFriendlyAuthError(error) }));
+    }
   }
-
-  try {
-    // Firebase Auth se sign in
-    const adminCredential = await signInWithEmailAndPassword(auth, adminAuth.email, adminAuth.password);
-    const user = adminCredential.user;
-    
-    // Role aur Name decide karna email ke mutabiq
-    const isAdminMti = enteredEmail === 'admin@mtiinteriors.com';
-    const adminRole = isAdminMti ? 'admin' : 'superadmin';
-    const adminName = isAdminMti ? 'MTI Admin' : 'Super Admin';
-
-    const session = {
-      token: await user.getIdToken(),
-      user: { 
-        id: user.uid, 
-        name: adminName, 
-        email: user.email, 
-        role: adminRole 
-      },
-    };
-
-    setAdminSession(session);
-    setViewMode('admin'); // Admin Panel open ho jayega
-    window.localStorage.setItem(authStorageKey, JSON.stringify(session));
-  } catch (error) {
-    setAdminFeedback((current) => ({ ...current, auth: error.message }));
-  }
-}
 
   async function handleAdminLogout() {
     try {
