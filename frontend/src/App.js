@@ -1079,7 +1079,7 @@ async function handleAdminLogin(event) {
                   <h2 id="auth-title">{authMode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
                   <p id="auth-description">
                     {authMode === 'login'
-                      ? 'Sign in to open your client portal or admin dashboard.'
+                      ? 'Access your MTI account to manage consultations, profile details, and project updates.'
                       : 'Set up your client profile and keep project details organized.'}
                   </p>
                 </div>
