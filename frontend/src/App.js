@@ -8,13 +8,13 @@ import AdminPanel from './AdminPanel';
 import UserPortal from './UserPortal';
 
 // Firebase Modules standard imports
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { 
   collection, doc, setDoc, addDoc, getDocs, getDoc, deleteDoc, query 
 } from 'firebase/firestore'; 
 
 // Humaray apnay config exports
-import { auth, googleProvider, db } from './firebase';
+import { auth, db } from './firebase';
 
 const authStorageKey = 'mti-admin-session';
 const userStorageKey = 'mti-user-session';
@@ -93,7 +93,6 @@ function App() {
   const [bookingForm, setBookingForm] = useState(bookingDefaults);
   const [inquiryForm, setInquiryForm] = useState(inquiryDefaults);
   const [statusMessage, setStatusMessage] = useState({ booking: '', inquiry: '' });
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [authSubmitting, setAuthSubmitting] = useState(false);
 
   const [adminAuth, setAdminAuth] = useState({
@@ -456,29 +455,6 @@ function App() {
     setAuthPanelOpen(false);
     return session;
   }
-
-  // Google Authentication Integration
-  const handleGoogleSignIn = async () => {
-    if (googleLoading) return;
-    setGoogleLoading(true);
-    try {
-      window.localStorage.removeItem(authStorageKey);
-      window.localStorage.removeItem(userStorageKey);
-      setUserFeedback((current) => ({ ...current, auth: '' }));
-      googleProvider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, googleProvider);
-      await routeSignedInUser(result.user, {
-        name: result.user.displayName || 'MTI Client',
-        phone: result.user.phoneNumber || '',
-      });
-    } catch (error) {
-      if (!['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(error.code)) {
-        setUserFeedback((current) => ({ ...current, auth: 'Google Sign-In failed.' }));
-      }
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   // User Email Password Flow
   async function handleUserAuthSubmit(event) {
@@ -1108,47 +1084,6 @@ async function handleAdminLogin(event) {
                   </p>
                 </div>
 
-                <div className="signin-tabs" role="tablist" aria-label="Choose sign in mode">
-                  <button
-                    type="button"
-                    className={authMode === 'login' ? 'is-active' : ''}
-                    role="tab"
-                    aria-selected={authMode === 'login'}
-                    onClick={() => {
-                      setAuthMode('login');
-                      setUserFeedback({});
-                    }}
-                  >
-                    Sign in
-                  </button>
-                  <button
-                    type="button"
-                    className={authMode === 'register' ? 'is-active' : ''}
-                    role="tab"
-                    aria-selected={authMode === 'register'}
-                    onClick={() => {
-                      setAuthMode('register');
-                      setUserFeedback({});
-                    }}
-                  >
-                    Create account
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  className="signin-google"
-                  onClick={handleGoogleSignIn}
-                  disabled={googleLoading}
-                >
-                  <img src="https://www.svgrepo.com/show/355037/google-icon.svg" className="signin-google-icon" alt="" />
-                  {googleLoading ? 'Opening Google...' : 'Continue with Google'}
-                </button>
-
-                <div className="signin-divider">
-                  <span>or email</span>
-                </div>
-
                 <form onSubmit={handleUserAuthSubmit} className="signin-form">
                   {authMode === 'register' && (
                     <div className="signin-two-fields">
@@ -1218,11 +1153,19 @@ async function handleAdminLogin(event) {
                   </button>
                 </form>
 
-                <p className="signin-note">
-                  {authMode === 'login'
-                    ? 'New to MTI? Create an account and we will prepare your client space.'
-                    : 'Already registered? Sign in to continue your project journey.'}
-                </p>
+                <div className="signin-switch-row">
+                  <span>{authMode === 'login' ? 'New to MTI?' : 'Already registered?'}</span>
+                  <button
+                    type="button"
+                    className="signin-switch"
+                    onClick={() => {
+                      setAuthMode(authMode === 'login' ? 'register' : 'login');
+                      setUserFeedback({});
+                    }}
+                  >
+                    {authMode === 'login' ? 'Create account' : 'Sign in'}
+                  </button>
+                </div>
               </div>
             </div>
           </section>
