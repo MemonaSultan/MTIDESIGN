@@ -68,6 +68,28 @@ export function FieldControl({ field, value, onChange }) {
     );
   }
 
+  if (field.type === 'select') {
+    return (
+      <label className="admin-field">
+        <span>{field.label}</span>
+        <select
+          required={Boolean(field.required)}
+          value={value ?? ''}
+          onChange={(event) => onChange(event.target.value)}
+        >
+          <option value="" disabled>
+            Select {field.label.toLowerCase()}
+          </option>
+          {(field.options || []).map((option) => (
+            <option key={option.value || option} value={option.value || option}>
+              {option.label || option}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
   return (
     <label className="admin-field">
       <span>{field.label}</span>

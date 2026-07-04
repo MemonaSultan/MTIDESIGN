@@ -596,6 +596,15 @@ function App() {
     }));
   }
 
+  function validateAdminCollectionItem(resourceKey, item, config) {
+    const categoryRequired = ['projects', 'products'].includes(resourceKey);
+    if (categoryRequired && !item.category) {
+      setAdminFeedback((current) => ({ ...current, [resourceKey]: `Please select a category before saving this ${config.title.toLowerCase()} item.` }));
+      return false;
+    }
+    return true;
+  }
+
   // Booking Form Submit Logic (With instant state-locking feedback)
   async function handleBookingSubmit(event) {
     event.preventDefault();
@@ -727,6 +736,7 @@ function App() {
     const dataKey = resourceKey === 'superadmin' ? 'users' : resourceKey;
     try {
       const itemData = { ...adminDrafts[resourceKey], createdAt: new Date().toISOString() };
+      if (!validateAdminCollectionItem(resourceKey, itemData, config)) return;
       if (resourceKey === 'superadmin') {
         itemData.email = itemData.email?.trim().toLowerCase() || '';
         itemData.role = itemData.role || 'admin';
@@ -791,6 +801,7 @@ function App() {
     const dataKey = resourceKey === 'superadmin' ? 'users' : resourceKey;
     try {
       const { id, ...cleanData } = item;
+      if (!validateAdminCollectionItem(resourceKey, item, config)) return;
       if (!String(id).startsWith('local-') && id !== 'default-superadmin') {
         await setDoc(doc(db, config.collection, id), cleanData, { merge: true });
       }

@@ -63,7 +63,13 @@ export const collectionConfigs = {
     },
     fields: [
       { key: "title", label: "Title" },
-      { key: "category", label: "Category" },
+      {
+        key: "category",
+        label: "Category",
+        type: "select",
+        required: true,
+        options: ["Curtains", "Wallpapers", "Flooring", "Furniture", "Blinds"],
+      },
       { key: "location", label: "Location" },
       { key: "imageUrl", label: "Project Image", type: "image" },
       { key: "videoUrl", label: "Video URL" },
@@ -89,7 +95,13 @@ export const collectionConfigs = {
     },
     fields: [
       { key: "name", label: "Name" },
-      { key: "category", label: "Category" },
+      {
+        key: "category",
+        label: "Category",
+        type: "select",
+        required: true,
+        options: ["Furniture", "Decor", "Blinds", "Lighting", "Flooring"],
+      },
       { key: "material", label: "Material" },
       { key: "price", label: "Price", type: "number" },
       { key: "imageUrl", label: "Product Image", type: "image" },
