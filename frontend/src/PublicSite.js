@@ -257,7 +257,11 @@ function PublicSite({
           <div className="card-grid">
             {filteredProducts.map((product) => (
               <article className="product-card" key={product.id}>
-                <div className="product-swatch" style={{ background: product.swatch }} />
+                {product.imageUrl ? (
+                  <img className="product-image" src={product.imageUrl} alt={product.name} />
+                ) : (
+                  <div className="product-swatch" style={{ background: product.swatch }} />
+                )}
                 <p className="card-kicker">{product.category}</p>
                 <h3>{product.name}</h3>
                 <p>{product.specification}</p>
@@ -325,22 +329,70 @@ function PublicSite({
             <article className="form-card">
               <p className="card-kicker">Book consultation</p>
               <h2>Schedule a design discussion</h2>
-              <form onSubmit={handleBookingSubmit}>
-                <div className="form-grid">
-                  <input aria-label="Full name" name="name" value={bookingForm.name} onChange={updateBookingForm} placeholder="Full name" required />
-                  <input aria-label="Phone number" name="phone" type="tel" value={bookingForm.phone} onChange={updateBookingForm} placeholder="Phone number" required />
-                  <input aria-label="Preferred date" name="date" type="date" value={bookingForm.date} onChange={updateBookingForm} required />
-                  <input aria-label="Preferred time" name="time" type="time" value={bookingForm.time} onChange={updateBookingForm} required />
-                  <select aria-label="Consultation type" name="consultationType" value={bookingForm.consultationType} onChange={updateBookingForm}>
-                    <option value="Studio consultation">Studio consultation</option>
-                    <option value="On-site consultation">On-site consultation</option>
-                    <option value="Virtual consultation">Virtual consultation</option>
-                  </select>
-                  <input aria-label="Space type" name="spaceType" value={bookingForm.spaceType} onChange={updateBookingForm} placeholder="Space type" />
+              <div className="booking-summary-panel">
+                <span>1</span>
+                <p>Share your contact details, preferred time, and project direction. MTI will confirm availability before scheduling.</p>
+              </div>
+              <form className="booking-form-modern" onSubmit={handleBookingSubmit}>
+                <div className="booking-section">
+                  <span className="booking-step-label">Client details</span>
+                  <div className="form-grid">
+                    <input aria-label="Full name" name="name" value={bookingForm.name} onChange={updateBookingForm} placeholder="Full name" required />
+                    <input aria-label="Phone number" name="phone" type="tel" value={bookingForm.phone} onChange={updateBookingForm} placeholder="Phone / WhatsApp" required />
+                    <input aria-label="Email address" name="email" type="email" value={bookingForm.email} onChange={updateBookingForm} placeholder="Email address" />
+                    <select aria-label="Preferred contact method" name="preferredContact" value={bookingForm.preferredContact} onChange={updateBookingForm}>
+                      <option value="WhatsApp">Contact by WhatsApp</option>
+                      <option value="Phone call">Contact by phone call</option>
+                      <option value="Email">Contact by email</option>
+                    </select>
+                  </div>
                 </div>
-                <textarea aria-label="Project requirements" name="requirements" value={bookingForm.requirements} onChange={updateBookingForm} placeholder="Tell us about your project requirements" />
-                <button className="primary-action" type="submit">Submit booking request</button>
-                {statusMessage.booking ? <p className="status-text">{statusMessage.booking}</p> : null}
+
+                <div className="booking-section">
+                  <span className="booking-step-label">Appointment</span>
+                  <div className="form-grid">
+                    <input aria-label="Preferred date" name="date" type="date" value={bookingForm.date} onChange={updateBookingForm} required />
+                    <input aria-label="Preferred time" name="time" type="time" value={bookingForm.time} onChange={updateBookingForm} required />
+                    <select aria-label="Consultation type" name="consultationType" value={bookingForm.consultationType} onChange={updateBookingForm}>
+                      <option value="Studio consultation">Studio consultation</option>
+                      <option value="On-site consultation">On-site consultation</option>
+                      <option value="Virtual consultation">Virtual consultation</option>
+                    </select>
+                    <select aria-label="Project timeline" name="urgency" value={bookingForm.urgency} onChange={updateBookingForm}>
+                      <option value="Flexible">Flexible timeline</option>
+                      <option value="This week">This week</option>
+                      <option value="This month">This month</option>
+                      <option value="Urgent">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="booking-section">
+                  <span className="booking-step-label">Project brief</span>
+                  <div className="form-grid">
+                    <input aria-label="Space type" name="spaceType" value={bookingForm.spaceType} onChange={updateBookingForm} placeholder="Space type, e.g. lounge, office" />
+                    <input aria-label="Project location" name="location" value={bookingForm.location} onChange={updateBookingForm} placeholder="Project location / area" />
+                    <select aria-label="Budget range" name="budgetRange" value={bookingForm.budgetRange} onChange={updateBookingForm}>
+                      <option value="">Budget range</option>
+                      <option value="Under PKR 100k">Under PKR 100k</option>
+                      <option value="PKR 100k - 300k">PKR 100k - 300k</option>
+                      <option value="PKR 300k - 700k">PKR 300k - 700k</option>
+                      <option value="PKR 700k+">PKR 700k+</option>
+                    </select>
+                  </div>
+                  <textarea aria-label="Project requirements" name="requirements" value={bookingForm.requirements} onChange={updateBookingForm} placeholder="Tell us about room size, services needed, preferred style, and any materials you like" required />
+                </div>
+
+                <label className="booking-consent">
+                  <input name="consent" type="checkbox" checked={bookingForm.consent} onChange={updateBookingForm} required />
+                  <span>I agree that MTI may contact me to confirm this consultation request.</span>
+                </label>
+
+                <div className="booking-actions">
+                  <button className="primary-action" type="submit">Request consultation</button>
+                  <a className="secondary-action" href={siteData.contact.whatsapp} rel="noreferrer" target="_blank">Prefer WhatsApp?</a>
+                </div>
+                {statusMessage.booking ? <p className="status-text booking-status">{statusMessage.booking}</p> : null}
               </form>
             </article>
 

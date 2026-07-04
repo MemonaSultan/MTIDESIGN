@@ -85,9 +85,16 @@ function AdminPanel(props) {
   const manageableFieldMap = {
     bookings: [
       { key: 'name', label: 'Client' },
+      { key: 'phone', label: 'Phone' },
+      { key: 'email', label: 'Email' },
       { key: 'consultationType', label: 'Consultation' },
       { key: 'date', label: 'Date' },
       { key: 'time', label: 'Time' },
+      { key: 'location', label: 'Location' },
+      { key: 'spaceType', label: 'Space Type' },
+      { key: 'budgetRange', label: 'Budget' },
+      { key: 'urgency', label: 'Timeline' },
+      { key: 'preferredContact', label: 'Contact By' },
       { key: 'status', label: 'Status' },
       { key: 'requirements', label: 'Estimate & Requirements', type: 'textarea' },
       { key: 'notes', label: 'Staff Notes', type: 'textarea' },

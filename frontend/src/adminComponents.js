@@ -1,6 +1,47 @@
 import React from 'react';
 
 export function FieldControl({ field, value, onChange }) {
+  if (field.type === 'image') {
+    function handleImageUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => onChange(reader.result);
+      reader.readAsDataURL(file);
+    }
+
+    return (
+      <div className="admin-field admin-image-field">
+        <span>{field.label}</span>
+        <input
+          type="url"
+          value={value || ''}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Paste image link"
+        />
+        <div className="admin-image-tools">
+          <label className="admin-file-picker">
+            <input accept="image/*" type="file" onChange={handleImageUpload} />
+            <span>Upload from gallery</span>
+          </label>
+          {value ? (
+            <button className="secondary-action compact-action" type="button" onClick={() => onChange('')}>
+              Remove image
+            </button>
+          ) : null}
+        </div>
+        {value ? (
+          <div className="admin-image-preview">
+            <img src={value} alt={`${field.label} preview`} />
+          </div>
+        ) : (
+          <small className="admin-field-hint">Use a web image link or upload an image from your device.</small>
+        )}
+      </div>
+    );
+  }
+
   if (field.type === 'textarea') {
     return (
       <label className="admin-field">

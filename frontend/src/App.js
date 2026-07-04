@@ -559,8 +559,9 @@ function App() {
 
   // Balanced single-click input handler without immediate state-clearing race conditions
   function updateObjectForm(setter) {
-    return ({ target: { name, value } }) => {
-      setter((current) => ({ ...current, [name]: value }));
+    return ({ target }) => {
+      const { name, value, type, checked } = target;
+      setter((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
     };
   }
 
@@ -599,18 +600,41 @@ function App() {
   async function handleBookingSubmit(event) {
     event.preventDefault();
     try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = bookingForm.date ? new Date(`${bookingForm.date}T00:00:00`) : null;
+
+      if (!bookingForm.consent) {
+        setStatusMessage((current) => ({ ...current, booking: 'Please confirm that MTI may contact you about this consultation.' }));
+        return;
+      }
+
+      if (selectedDate && selectedDate < today) {
+        setStatusMessage((current) => ({ ...current, booking: 'Please choose today or a future date for your consultation.' }));
+        return;
+      }
+
       const bookingRef = 'MTI-' + Math.floor(100000 + Math.random() * 900000);
       const finalBookingData = {
         ...bookingForm,
+        name: bookingForm.name.trim(),
+        email: bookingForm.email.trim(),
+        phone: bookingForm.phone.trim(),
+        location: bookingForm.location.trim(),
+        spaceType: bookingForm.spaceType.trim(),
+        requirements: bookingForm.requirements.trim(),
         reference: bookingRef,
+        source: 'public-site',
         createdAt: new Date().toISOString(),
-        status: 'pending'
+        status: 'new'
       };
 
-      await addDoc(collection(db, 'bookings'), finalBookingData);
+      const docRef = await addDoc(collection(db, 'bookings'), finalBookingData);
+      const createdBooking = { id: docRef.id, ...finalBookingData };
+      setAdminData((current) => ({ ...current, bookings: [createdBooking, ...current.bookings] }));
 
       setStatusMessage({
-        booking: `Booking request ${bookingRef} submitted successfully!`,
+        booking: `Booking request ${bookingRef} submitted. MTI will contact you by ${bookingForm.preferredContact}.`,
         inquiry: ''
       });
       setBookingForm(bookingDefaults);

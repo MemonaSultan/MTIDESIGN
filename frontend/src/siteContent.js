@@ -266,12 +266,18 @@ export const studioFacts = [
 
 export const bookingDefaults = {
   name: '',
+  email: '',
   phone: '',
   date: '',
   time: '',
   consultationType: 'Studio consultation',
   spaceType: '',
+  location: '',
+  budgetRange: '',
+  urgency: 'Flexible',
+  preferredContact: 'WhatsApp',
   requirements: '',
+  consent: false,
 };
 
 export const inquiryDefaults = {

@@ -92,7 +92,7 @@ export const collectionConfigs = {
       { key: "category", label: "Category" },
       { key: "material", label: "Material" },
       { key: "price", label: "Price", type: "number" },
-      { key: "imageUrl", label: "Image URL" },
+      { key: "imageUrl", label: "Product Image", type: "image" },
       { key: "swatch", label: "Swatch" },
       { key: "specification", label: "Specification", type: "textarea" },
       { key: "featured", label: "Featured", type: "checkbox" },
