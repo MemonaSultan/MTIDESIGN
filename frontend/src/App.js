@@ -379,10 +379,17 @@ function App() {
 
   function upsertLocalStaffAccount(account) {
     const email = account.email.trim().toLowerCase();
+    const normalizedAccount = {
+      ...account,
+      email,
+      password: account.password || '',
+      status: account.status || 'active',
+      role: account.role || 'admin',
+    };
     const accounts = getLocalStaffAccounts().filter(
       (item) => item.email?.trim().toLowerCase() !== email && item.id !== account.id
     );
-    saveLocalStaffAccounts([{ ...account, email }, ...accounts]);
+    saveLocalStaffAccounts([normalizedAccount, ...accounts]);
   }
 
   function showSiteSection(sectionId) {
@@ -404,6 +411,7 @@ function App() {
       'auth/weak-password': 'Please use a stronger password with at least 6 characters.',
       'auth/wrong-password': 'The password is incorrect. Please try again.',
       'mti/not-admin': 'This account is a client account. Please use an admin email and password for the admin panel.',
+      'mti/staff-suspended': 'This staff account is suspended. Please contact the super admin.',
     };
 
     return messageMap[error?.code] || 'Sign in could not be completed. Please try again.';
@@ -483,6 +491,14 @@ function App() {
         if (localStaffAccount) {
           buildAdminSession(localStaffAccount);
           return;
+        }
+        const localStaffEmail = getLocalStaffAccounts().find(
+          (account) => account.email?.trim().toLowerCase() === userAuth.email.trim().toLowerCase()
+        );
+        if (localStaffEmail) {
+          const error = new Error(localStaffEmail.status === 'suspended' ? 'This staff account is suspended.' : 'The staff account password is incorrect.');
+          error.code = localStaffEmail.status === 'suspended' ? 'mti/staff-suspended' : 'auth/wrong-password';
+          throw error;
         }
         userCredential = await signInWithEmailAndPassword(auth, userAuth.email, userAuth.password);
       }
@@ -645,6 +661,19 @@ function App() {
       return;
     }
 
+    const localStaffEmail = getLocalStaffAccounts().find(
+      (account) => account.email?.trim().toLowerCase() === adminAuth.email.trim().toLowerCase()
+    );
+    if (localStaffEmail) {
+      setAdminFeedback((current) => ({
+        ...current,
+        auth: localStaffEmail.status === 'suspended'
+          ? 'This staff account is suspended.'
+          : 'The password for this staff account is incorrect.',
+      }));
+      return;
+    }
+
     try {
       const adminCredential = await signInWithEmailAndPassword(auth, adminAuth.email, adminAuth.password);
       await routeSignedInUser(adminCredential.user, {}, { requireAdmin: true });
@@ -675,6 +704,9 @@ function App() {
     try {
       const itemData = { ...adminDrafts[resourceKey], createdAt: new Date().toISOString() };
       if (resourceKey === 'superadmin') {
+        itemData.email = itemData.email?.trim().toLowerCase() || '';
+        itemData.role = itemData.role || 'admin';
+        itemData.status = itemData.status || 'active';
         if (!itemData.name || !itemData.email) {
           setAdminFeedback((current) => ({ ...current, superadmin: 'Name and email are required.' }));
           return;
@@ -694,7 +726,12 @@ function App() {
       setAdminData((current) => ({ ...current, [dataKey]: nextItems }));
       syncPublicState(dataKey, nextItems);
       setAdminDrafts((current) => ({ ...current, [resourceKey]: config.emptyItem }));
-      setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} dynamic entry added.` }));
+      setAdminFeedback((current) => ({
+        ...current,
+        [resourceKey]: resourceKey === 'superadmin'
+          ? `${createdItem.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready. Use ${createdItem.email} with the password you entered.`
+          : `${config.title} dynamic entry added.`,
+      }));
     } catch (error) {
       if (resourceKey === 'superadmin') {
         const itemData = {
@@ -702,6 +739,9 @@ function App() {
           id: `local-${Date.now()}`,
           createdAt: new Date().toISOString(),
         };
+        itemData.email = itemData.email?.trim().toLowerCase() || '';
+        itemData.role = itemData.role || 'admin';
+        itemData.status = itemData.status || 'active';
         if (!itemData.name || !itemData.email) {
           setAdminFeedback((current) => ({ ...current, superadmin: 'Name and email are required.' }));
           return;
@@ -714,7 +754,7 @@ function App() {
         const nextItems = [itemData, ...adminData.users];
         setAdminData((current) => ({ ...current, users: nextItems }));
         setAdminDrafts((current) => ({ ...current, superadmin: config.emptyItem }));
-        setAdminFeedback((current) => ({ ...current, superadmin: 'Account created locally for this admin workspace.' }));
+        setAdminFeedback((current) => ({ ...current, superadmin: `${itemData.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready locally. Use ${itemData.email} with the password you entered.` }));
         return;
       }
       setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));

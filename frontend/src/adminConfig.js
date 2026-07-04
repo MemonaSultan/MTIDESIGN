@@ -142,8 +142,9 @@ export const collectionConfigs = {
     emptyItem: {
       name: "",
       email: "",
+      password: "",
       phone: "",
-      role: "user",
+      role: "admin",
       status: "active",
       createdAt: Date.now(),
     },

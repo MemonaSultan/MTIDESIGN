@@ -256,7 +256,7 @@ function AdminPanel(props) {
                 onChange={(value) => setDraftValue('superadmin', 'email', value)}
               />
               <FieldControl
-                field={{ key: 'password', label: 'Password' }}
+                field={{ key: 'password', label: 'Login Password', type: 'password' }}
                 value={adminDrafts.superadmin.password}
                 onChange={(value) => setDraftValue('superadmin', 'password', value)}
               />
@@ -272,9 +272,9 @@ function AdminPanel(props) {
                   onChange={(e) => setDraftValue('superadmin', 'role', e.target.value)}
                   className="admin-select-luxury"
                 >
-                  <option value="admin">Administrator</option>
-                  <option value="superadmin">Super Admin (Boss)</option>
-                  <option value="user">Standard Client</option>
+                  <option value="admin">Admin - can manage site</option>
+                  <option value="superadmin">Super Admin - full access</option>
+                  <option value="user">Client account</option>
                 </select>
               </label>
               <label className="admin-field">
