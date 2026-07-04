@@ -434,9 +434,6 @@ function PublicSite({
             </article>
 
             <article className="contact-card">
-              <div className="contact-card-media">
-                <img alt="MTI Interiors and Decor premium letterhead design" src={brandAssets.letterhead} />
-              </div>
               <div className="contact-card-copy">
                 <p className="card-kicker">Send a project brief</p>
                 <h2>Contact the studio directly</h2>

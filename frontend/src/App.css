@@ -353,8 +353,7 @@
 .showroom-frame img,
 .brand-card img,
 .showcase-tile img,
-.project-art,
-.contact-card-media img {
+.project-art {
   display: block;
   height: 100%;
   object-fit: cover;
@@ -1024,8 +1023,7 @@
 }
 
 .contact-card {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.84fr) minmax(0, 1.16fr);
+  display: block;
   overflow: hidden;
 }
 
