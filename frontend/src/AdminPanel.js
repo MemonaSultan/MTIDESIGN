@@ -39,11 +39,17 @@ function renderSimpleManager({
               <button className="primary-action" type="button" onClick={() => saveSimpleRecord(adminTab, simpleEndpointMap[adminTab], item)}>
                 Save
               </button>
-              {adminTab !== 'bookings' ? (
-                <button className="secondary-action" type="button" onClick={() => deleteSimpleRecord(adminTab, simpleEndpointMap[adminTab], item.id)}>
-                  Delete
-                </button>
-              ) : null}
+              <button
+                className="secondary-action delete-action-red"
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Delete this ${adminTab.slice(0, -1)} record? This cannot be undone.`)) {
+                    deleteSimpleRecord(adminTab, simpleEndpointMap[adminTab], item.id);
+                  }
+                }}
+              >
+                Delete
+              </button>
             </div>
           </article>
         ))}

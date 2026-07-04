@@ -336,12 +336,22 @@ function PublicSite({
             <a href="#services">Review services</a>
           </div>
           <div className="dual-panel">
-            <article className="form-card">
-              <p className="card-kicker">Book consultation</p>
-              <h2>Schedule a design discussion</h2>
+            <article className="form-card booking-card">
+              <div className="booking-card-head">
+                <div>
+                  <p className="card-kicker">Book consultation</p>
+                  <h2>Schedule a design discussion</h2>
+                </div>
+                <span className="booking-live-badge">Response within 24h</span>
+              </div>
               <div className="booking-summary-panel">
-                <span>1</span>
-                <p>Share your contact details, preferred time, and project direction. MTI will confirm availability before scheduling.</p>
+                <span>MTI</span>
+                <p>Tell us what you want to improve. We will review your details, confirm availability, and guide the next step before any visit is scheduled.</p>
+              </div>
+              <div className="booking-trust-grid" aria-label="Booking benefits">
+                <span>No obligation request</span>
+                <span>Studio or on-site options</span>
+                <span>WhatsApp follow-up</span>
               </div>
               <form className="booking-form-modern" onSubmit={handleBookingSubmit}>
                 <div className="booking-section">
