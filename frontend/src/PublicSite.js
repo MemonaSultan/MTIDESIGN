@@ -134,14 +134,23 @@ function PublicSite({
           </div>
           <div className="card-grid">
             {siteData.services.map((service) => (
-              <article className="info-card" key={service.id}>
-                <span className="accent-line" />
+              <article className="info-card service-card" key={service.id}>
+                <div className="service-card-top">
+                  <span className="accent-line" />
+                  {service.featured ? <span className="service-status">Featured</span> : null}
+                </div>
                 <p className="card-kicker">{service.category}</p>
                 <h3>{service.name}</h3>
                 <p>{service.description}</p>
-                <div className="card-meta">
-                  <span>{service.timeline}</span>
-                  <strong>{service.price}</strong>
+                <div className="service-meta-grid">
+                  <span>
+                    <small>Timeline</small>
+                    {service.timeline || 'Project based'}
+                  </span>
+                  <strong>
+                    <small>Budget</small>
+                    {service.price || 'On request'}
+                  </strong>
                 </div>
                 <a className="card-action-link" href="#consultation">
                   Request this service

@@ -597,7 +597,7 @@ function App() {
   }
 
   function validateAdminCollectionItem(resourceKey, item, config) {
-    const categoryRequired = ['projects', 'products'].includes(resourceKey);
+    const categoryRequired = ['services', 'projects', 'products'].includes(resourceKey);
     if (categoryRequired && !item.category) {
       setAdminFeedback((current) => ({ ...current, [resourceKey]: `Please select a category before saving this ${config.title.toLowerCase()} item.` }));
       return false;
