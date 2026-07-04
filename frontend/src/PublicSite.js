@@ -189,14 +189,17 @@ function PublicSite({
           <div className="portfolio-grid">
             {filteredProjects.map((project, index) => (
               <article className="project-card" key={project.id}>
-                <img
-                  alt={project.title}
-                  className="project-art"
-                  src={
-                    project.imageUrl ||
-                    [brandAssets.showroom, brandAssets.banner, brandAssets.identity, brandAssets.letterhead][index % 4]
-                  }
-                />
+                <div className="project-media">
+                  <img
+                    alt={project.title}
+                    className="project-art"
+                    src={
+                      project.imageUrl ||
+                      [brandAssets.showroom, brandAssets.banner, brandAssets.identity, brandAssets.letterhead][index % 4]
+                    }
+                  />
+                  <div className="project-media-badge">{project.category}</div>
+                </div>
                 <div className="project-copy">
                   <div className="project-header">
                     <span>{project.category}</span>
@@ -204,9 +207,16 @@ function PublicSite({
                   </div>
                   <h3>{project.title}</h3>
                   <p>{project.description}</p>
-                  <a className="card-action-link" href="#consultation">
-                    Plan a similar space
-                  </a>
+                  <div className="project-card-actions">
+                    <a className="card-action-link" href="#consultation">
+                      Plan a similar space
+                    </a>
+                    {project.videoUrl ? (
+                      <a className="project-video-link" href={project.videoUrl} rel="noreferrer" target="_blank">
+                        View video
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               </article>
             ))}

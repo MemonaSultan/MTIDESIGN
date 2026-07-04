@@ -676,14 +676,75 @@
 
 .project-card {
   overflow: hidden;
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.project-card:hover {
+  box-shadow: 0 28px 70px rgba(58, 34, 22, 0.16);
+  transform: translateY(-3px);
+}
+
+.project-media {
+  background: #f8f3ec;
+  overflow: hidden;
+  position: relative;
 }
 
 .project-art {
   aspect-ratio: 1 / 0.88;
+  transition: transform 220ms ease;
+}
+
+.project-card:hover .project-art {
+  transform: scale(1.035);
+}
+
+.project-media-badge {
+  background: rgba(47, 27, 18, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  bottom: 16px;
+  color: #fff8ef;
+  font-size: 0.72rem;
+  font-weight: 900;
+  left: 16px;
+  letter-spacing: 0.12em;
+  padding: 8px 12px;
+  position: absolute;
+  text-transform: uppercase;
 }
 
 .project-copy {
   padding: 22px;
+}
+
+.project-card-actions {
+  align-items: center;
+  border-top: 1px solid rgba(166, 118, 63, 0.14);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.project-card-actions .card-action-link {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+  width: auto;
+}
+
+.project-video-link {
+  background: rgba(198, 149, 79, 0.12);
+  border: 1px solid rgba(198, 149, 79, 0.22);
+  border-radius: 999px;
+  color: var(--wood-800);
+  font-size: 0.84rem;
+  font-weight: 900;
+  padding: 8px 12px;
+  text-decoration: none;
 }
 
 .product-image,

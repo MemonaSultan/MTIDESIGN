@@ -65,7 +65,7 @@ export const collectionConfigs = {
       { key: "title", label: "Title" },
       { key: "category", label: "Category" },
       { key: "location", label: "Location" },
-      { key: "imageUrl", label: "Image URL" },
+      { key: "imageUrl", label: "Project Image", type: "image" },
       { key: "videoUrl", label: "Video URL" },
       { key: "description", label: "Description", type: "textarea" },
       { key: "featured", label: "Featured", type: "checkbox" },
