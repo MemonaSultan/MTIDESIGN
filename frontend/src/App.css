@@ -2119,8 +2119,35 @@
   gap: 30px;
 }
 
+.superadmin-metric-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 22px;
+}
+
+.superadmin-metric-card {
+  display: grid;
+  gap: 8px;
+  min-height: 116px;
+}
+
+.superadmin-metric-card span {
+  color: var(--ink-600);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.superadmin-metric-card strong {
+  color: var(--wood-800);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.25rem;
+}
+
 @media (max-width: 900px) {
-  .superadmin-grid-layout {
+  .superadmin-grid-layout,
+  .superadmin-metric-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2143,6 +2170,28 @@
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+
+.staff-directory-head {
+  display: grid;
+  gap: 14px;
+}
+
+.staff-filter-bar {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 190px;
+}
+
+.staff-filter-bar input,
+.staff-filter-bar select {
+  background: #ffffff;
+  border: 1px solid rgba(166, 118, 63, 0.18);
+  border-radius: 8px;
+  color: var(--ink-900);
+  font: inherit;
+  min-width: 0;
+  padding: 13px 14px;
 }
 
 .staff-cards-container {
@@ -2172,6 +2221,43 @@
 
 .staff-user-card.role-user {
   border-left: 5px solid #a6a6a6;
+}
+
+.staff-edit-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.staff-edit-grid .admin-field,
+.staff-edit-grid .admin-check {
+  min-width: 0;
+}
+
+.staff-edit-grid .admin-field:last-child {
+  grid-column: 1 / -1;
+}
+
+.permission-summary {
+  background: rgba(255, 250, 244, 0.9);
+  border: 1px solid rgba(166, 118, 63, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.permission-summary span,
+.staff-empty-state span {
+  color: var(--ink-600);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.staff-empty-state {
+  padding: 24px;
 }
 
 @media (max-width: 780px) {
@@ -2243,7 +2329,9 @@
   .metric-grid,
   .admin-grid,
   .admin-command-center,
-  .superadmin-grid-layout {
+  .superadmin-grid-layout,
+  .staff-filter-bar,
+  .staff-edit-grid {
     grid-template-columns: 1fr;
   }
 }

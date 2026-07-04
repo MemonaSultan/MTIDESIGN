@@ -87,6 +87,8 @@ function AdminPanel(props) {
     setAdminData,
     setViewMode,
   } = props;
+  const [staffSearch, setStaffSearch] = React.useState('');
+  const [staffRoleFilter, setStaffRoleFilter] = React.useState('all');
 
   const manageableFieldMap = {
     bookings: [
@@ -241,6 +243,18 @@ function AdminPanel(props) {
     { label: 'Live catalog items', value: adminData.products.filter((item) => item.featured !== false).length },
     { label: 'Approved reviews', value: adminData.reviews.filter((item) => item.approved === true).length },
   ];
+  const staffQuery = staffSearch.trim().toLowerCase();
+  const filteredStaffUsers = adminData.users.filter((user) => {
+    const roleMatch = staffRoleFilter === 'all' || user.role === staffRoleFilter || user.status === staffRoleFilter;
+    const queryMatch = !staffQuery || `${user.name} ${user.email} ${user.phone} ${user.department} ${user.permissions}`.toLowerCase().includes(staffQuery);
+    return roleMatch && queryMatch;
+  });
+  const superAdminMetrics = [
+    { label: 'Total accounts', value: adminData.users.length },
+    { label: 'Super admins', value: adminData.users.filter((user) => user.role === 'superadmin').length },
+    { label: 'Admins', value: adminData.users.filter((user) => user.role === 'admin').length },
+    { label: 'Suspended', value: adminData.users.filter((user) => user.status === 'suspended').length },
+  ];
 
   let body = null;
 
@@ -312,6 +326,15 @@ function AdminPanel(props) {
           {adminFeedback.superadmin ? <span className="admin-feedback">{adminFeedback.superadmin}</span> : null}
         </div>
 
+        <div className="superadmin-metric-grid">
+          {superAdminMetrics.map((metric) => (
+            <article className="admin-card superadmin-metric-card" key={metric.label}>
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+            </article>
+          ))}
+        </div>
+
         <div className="superadmin-grid-layout">
           <article className="admin-card staff-add-card">
             <h3 className="card-heading-premium">Create New Account</h3>
@@ -336,6 +359,16 @@ function AdminPanel(props) {
                 value={adminDrafts.superadmin.phone}
                 onChange={(value) => setDraftValue('superadmin', 'phone', value)}
               />
+              <FieldControl
+                field={{ key: 'department', label: 'Department', type: 'select', options: ['Operations', 'Sales', 'Design', 'Content', 'Management'] }}
+                value={adminDrafts.superadmin.department}
+                onChange={(value) => setDraftValue('superadmin', 'department', value)}
+              />
+              <FieldControl
+                field={{ key: 'permissions', label: 'Permission Preset', type: 'select', options: ['Site management', 'Content and catalog', 'Bookings and inquiries', 'Full business control', 'Client access only'] }}
+                value={adminDrafts.superadmin.permissions}
+                onChange={(value) => setDraftValue('superadmin', 'permissions', value)}
+              />
               <label className="admin-field">
                 <span>Access Level (Role)</span>
                 <select
@@ -359,6 +392,15 @@ function AdminPanel(props) {
                   <option value="suspended">Suspended</option>
                 </select>
               </label>
+              <FieldControl
+                field={{ key: 'notes', label: 'Internal Notes', type: 'textarea' }}
+                value={adminDrafts.superadmin.notes}
+                onChange={(value) => setDraftValue('superadmin', 'notes', value)}
+              />
+            </div>
+            <div className="permission-summary">
+              <span>Admin: manages site content, catalog, bookings, inquiries, reviews, reports, and settings.</span>
+              <span>Super admin: includes all admin tools plus staff, client account, and access control.</span>
             </div>
             <div className="admin-actions">
               <button className="primary-action luxury-btn" type="button" onClick={() => createCollectionItem('superadmin')}>
@@ -368,9 +410,31 @@ function AdminPanel(props) {
           </article>
 
           <div className="staff-directory">
-            <h3 className="card-heading-premium">User Directory ({adminData.users.length})</h3>
+            <div className="staff-directory-head">
+              <h3 className="card-heading-premium">User Directory ({filteredStaffUsers.length})</h3>
+              <div className="staff-filter-bar">
+                <input
+                  aria-label="Search accounts"
+                  value={staffSearch}
+                  onChange={(event) => setStaffSearch(event.target.value)}
+                  placeholder="Search name, email, phone..."
+                />
+                <select
+                  aria-label="Filter accounts"
+                  value={staffRoleFilter}
+                  onChange={(event) => setStaffRoleFilter(event.target.value)}
+                >
+                  <option value="all">All accounts</option>
+                  <option value="superadmin">Super admins</option>
+                  <option value="admin">Admins</option>
+                  <option value="user">Clients</option>
+                  <option value="active">Active</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </div>
+            </div>
             <div className="staff-cards-container">
-              {adminData.users.map((user) => (
+              {filteredStaffUsers.map((user) => (
                 <article className={`admin-card staff-user-card role-${user.role}`} key={user.id}>
                   <div className="staff-user-header">
                     <div className="staff-user-identity">
@@ -387,17 +451,32 @@ function AdminPanel(props) {
                     </span>
                   </div>
 
+                  <div className="staff-edit-grid">
+                    <FieldControl field={{ key: 'name', label: 'Name' }} value={user.name} onChange={(value) => updateCollectionItem('superadmin', user.id, 'name', value)} />
+                    <FieldControl field={{ key: 'email', label: 'Email', type: 'email' }} value={user.email} onChange={(value) => updateCollectionItem('superadmin', user.id, 'email', value)} />
+                    <FieldControl field={{ key: 'phone', label: 'Phone' }} value={user.phone} onChange={(value) => updateCollectionItem('superadmin', user.id, 'phone', value)} />
+                    <FieldControl field={{ key: 'department', label: 'Department', type: 'select', options: ['Operations', 'Sales', 'Design', 'Content', 'Management'] }} value={user.department || 'Operations'} onChange={(value) => updateCollectionItem('superadmin', user.id, 'department', value)} />
+                    <FieldControl field={{ key: 'role', label: 'Role', type: 'select', options: [{ value: 'admin', label: 'Admin' }, { value: 'superadmin', label: 'Super Admin' }, { value: 'user', label: 'Client' }] }} value={user.role} onChange={(value) => updateCollectionItem('superadmin', user.id, 'role', value)} />
+                    <FieldControl field={{ key: 'status', label: 'Status', type: 'select', options: ['active', 'suspended'] }} value={user.status || 'active'} onChange={(value) => updateCollectionItem('superadmin', user.id, 'status', value)} />
+                    <FieldControl field={{ key: 'permissions', label: 'Permissions', type: 'select', options: ['Site management', 'Content and catalog', 'Bookings and inquiries', 'Full business control', 'Client access only'] }} value={user.permissions || (user.role === 'superadmin' ? 'Full business control' : user.role === 'admin' ? 'Site management' : 'Client access only')} onChange={(value) => updateCollectionItem('superadmin', user.id, 'permissions', value)} />
+                    <FieldControl field={{ key: 'notes', label: 'Notes', type: 'textarea' }} value={user.notes || ''} onChange={(value) => updateCollectionItem('superadmin', user.id, 'notes', value)} />
+                  </div>
+
                   <div className="staff-details">
-                    <span><strong>Phone:</strong> {user.phone || 'N/A'}</span>
+                    <span><strong>Department:</strong> {user.department || 'Operations'}</span>
+                    <span><strong>Permissions:</strong> {user.permissions || (user.role === 'superadmin' ? 'Full business control' : 'Site management')}</span>
                     <span>
                       <strong>Status:</strong>{' '}
-                      <span className={`status-text-badge ${user.status}`}>
-                        {user.status}
+                      <span className={`status-text-badge ${user.status || 'active'}`}>
+                        {user.status || 'active'}
                       </span>
                     </span>
                   </div>
 
                   <div className="admin-actions staff-actions-row">
+                    <button className="primary-action compact-action" type="button" onClick={() => saveCollectionItem('superadmin', user)}>
+                      Save Profile
+                    </button>
                     <button
                       className="secondary-action compact-action"
                       type="button"
@@ -407,13 +486,17 @@ function AdminPanel(props) {
                         saveCollectionItem('superadmin', updatedUser);
                       }}
                     >
-                      {user.status === 'active' ? '⚠️ Suspend' : '✅ Activate'}
+                      {user.status === 'active' ? 'Suspend' : 'Activate'}
                     </button>
                     {user.id !== adminSession.user?.id ? (
                       <button
                         className="secondary-action delete-action-red"
                         type="button"
-                        onClick={() => deleteCollectionItem('superadmin', user.id)}
+                        onClick={() => {
+                          if (window.confirm(`Delete ${user.name || user.email}? This cannot be undone.`)) {
+                            deleteCollectionItem('superadmin', user.id);
+                          }
+                        }}
                       >
                         Delete
                       </button>
@@ -423,6 +506,12 @@ function AdminPanel(props) {
                   </div>
                 </article>
               ))}
+              {filteredStaffUsers.length === 0 ? (
+                <article className="admin-card empty-state staff-empty-state">
+                  <strong>No accounts matched this filter.</strong>
+                  <span>Try another role, status, name, email, or phone search.</span>
+                </article>
+              ) : null}
             </div>
           </div>
         </div>

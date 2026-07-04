@@ -874,7 +874,9 @@ function App() {
       setAdminFeedback((current) => ({
         ...current,
         [resourceKey]: resourceKey === 'superadmin'
-          ? `${createdItem.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready. Use ${createdItem.email} with the password you entered.`
+          ? ['admin', 'superadmin'].includes(createdItem.role)
+            ? `${createdItem.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready. Use ${createdItem.email} with the password you entered.`
+            : `Client account for ${createdItem.email} is ready.`
           : `${config.title} dynamic entry added.`,
       }));
     } catch (error) {
@@ -899,7 +901,12 @@ function App() {
         const nextItems = [itemData, ...adminData.users];
         setAdminData((current) => ({ ...current, users: nextItems }));
         setAdminDrafts((current) => ({ ...current, superadmin: config.emptyItem }));
-        setAdminFeedback((current) => ({ ...current, superadmin: `${itemData.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready locally. Use ${itemData.email} with the password you entered.` }));
+        setAdminFeedback((current) => ({
+          ...current,
+          superadmin: ['admin', 'superadmin'].includes(itemData.role)
+            ? `${itemData.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready locally. Use ${itemData.email} with the password you entered.`
+            : `Client account for ${itemData.email} is ready locally.`,
+        }));
         return;
       }
       setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));
@@ -916,9 +923,13 @@ function App() {
       if (!String(id).startsWith('local-') && id !== 'default-superadmin') {
         await setDoc(doc(db, config.collection, id), cleanData, { merge: true });
       }
-      if (resourceKey === 'superadmin' && ['admin', 'superadmin'].includes(item.role)) {
+      if (resourceKey === 'superadmin') {
         const existing = getLocalStaffAccounts().find((account) => account.id === id || account.email === item.email);
-        upsertLocalStaffAccount({ ...existing, ...item, password: item.password || existing?.password || '' });
+        if (['admin', 'superadmin'].includes(item.role)) {
+          upsertLocalStaffAccount({ ...existing, ...item, password: item.password || existing?.password || '' });
+        } else {
+          saveLocalStaffAccounts(getLocalStaffAccounts().filter((account) => account.id !== id && account.email !== item.email));
+        }
       }
 
       const nextItems = adminData[dataKey].map((entry) => (entry.id === item.id ? item : entry));

@@ -260,12 +260,18 @@ export const collectionConfigs = {
       phone: "",
       role: "admin",
       status: "active",
+      department: "Operations",
+      permissions: "Site management",
+      notes: "",
       createdAt: Date.now(),
     },
     fields: [
       { key: "name", label: "Name" },
       { key: "email", label: "Email" },
       { key: "phone", label: "Phone" },
+      { key: "department", label: "Department" },
+      { key: "permissions", label: "Permissions" },
+      { key: "notes", label: "Notes", type: "textarea" },
       {
         key: "role",
         label: "Role",
