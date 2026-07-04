@@ -1036,6 +1036,29 @@
   margin-bottom: 18px;
 }
 
+.inquiry-form-modern {
+  display: grid;
+  gap: 14px;
+}
+
+.inquiry-consent {
+  align-items: start;
+  background: rgba(255, 250, 244, 0.88);
+  border: 1px solid rgba(166, 118, 63, 0.16);
+  border-radius: 8px;
+  color: var(--ink-700);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr;
+  line-height: 1.55;
+  padding: 13px 14px;
+}
+
+.inquiry-consent input {
+  accent-color: var(--wood-800);
+  margin-top: 4px;
+}
+
 .contact-shortcuts {
   display: flex;
   flex-wrap: wrap;
@@ -1618,10 +1641,18 @@
 }
 
 .status-resolved,
-.status-completed {
+.status-completed,
+.status-contacted,
+.status-quoted {
   background: #eef2ff;
   border-color: #c7d2fe;
   color: #3730a3;
+}
+
+.status-closed {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 .content-health-grid {

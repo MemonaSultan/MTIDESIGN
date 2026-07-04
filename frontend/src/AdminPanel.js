@@ -107,9 +107,41 @@ function AdminPanel(props) {
     ],
     inquiries: [
       { key: 'name', label: 'Name' },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Phone / WhatsApp' },
       { key: 'subject', label: 'Subject' },
-      { key: 'status', label: 'Status' },
-      { key: 'reply', label: 'Reply', type: 'textarea' },
+      {
+        key: 'serviceInterest',
+        label: 'Service',
+        type: 'select',
+        options: ['Curtains and drapery', 'Window blinds', 'Wallpaper and panels', 'Flooring solutions', 'Furniture sourcing', 'Complete interior styling'],
+      },
+      {
+        key: 'projectType',
+        label: 'Project Type',
+        type: 'select',
+        options: ['Home', 'Apartment', 'Office', 'Shop / Showroom', 'Restaurant / Cafe', 'Other'],
+      },
+      {
+        key: 'budgetRange',
+        label: 'Budget',
+        type: 'select',
+        options: ['Under PKR 100k', 'PKR 100k - 300k', 'PKR 300k - 700k', 'PKR 700k+', 'Need guidance'],
+      },
+      {
+        key: 'preferredContact',
+        label: 'Contact By',
+        type: 'select',
+        options: ['WhatsApp', 'Phone call', 'Email'],
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        type: 'select',
+        options: ['new', 'pending', 'contacted', 'quoted', 'closed'],
+      },
+      { key: 'message', label: 'Client Message', type: 'textarea' },
+      { key: 'reply', label: 'Staff Reply / Notes', type: 'textarea' },
     ],
     reviews: [
       { key: 'name', label: 'Name' },

@@ -438,14 +438,49 @@ function PublicSite({
                   <a href={`tel:+92${siteData.contact.secondaryPhone.replace(/\D/g, '')}`}>{siteData.contact.secondaryPhone}</a>
                   <a href={siteData.contact.whatsapp} rel="noreferrer" target="_blank">WhatsApp conversation</a>
                 </div>
-                <form onSubmit={handleInquirySubmit}>
+                <form className="inquiry-form-modern" onSubmit={handleInquirySubmit}>
                   <div className="form-grid">
                     <input aria-label="Full name" name="name" value={inquiryForm.name} onChange={updateInquiryForm} placeholder="Full name" required />
-                    <input aria-label="Email address" name="email" type="email" value={inquiryForm.email} onChange={updateInquiryForm} placeholder="Email address" />
-                    <input aria-label="Subject" name="subject" value={inquiryForm.subject} onChange={updateInquiryForm} placeholder="Subject" required />
                     <input aria-label="Phone or WhatsApp" name="phone" type="tel" value={inquiryForm.phone} onChange={updateInquiryForm} placeholder="Phone or WhatsApp" />
+                    <input aria-label="Email address" name="email" type="email" value={inquiryForm.email} onChange={updateInquiryForm} placeholder="Email address" />
+                    <select aria-label="Preferred contact method" name="preferredContact" value={inquiryForm.preferredContact} onChange={updateInquiryForm}>
+                      <option value="WhatsApp">Contact by WhatsApp</option>
+                      <option value="Phone call">Contact by phone call</option>
+                      <option value="Email">Contact by email</option>
+                    </select>
+                    <input aria-label="Subject" name="subject" value={inquiryForm.subject} onChange={updateInquiryForm} placeholder="Subject" required />
+                    <select aria-label="Service interest" name="serviceInterest" value={inquiryForm.serviceInterest} onChange={updateInquiryForm}>
+                      <option value="">Service interest</option>
+                      <option value="Curtains and drapery">Curtains and drapery</option>
+                      <option value="Window blinds">Window blinds</option>
+                      <option value="Wallpaper and panels">Wallpaper and panels</option>
+                      <option value="Flooring solutions">Flooring solutions</option>
+                      <option value="Furniture sourcing">Furniture sourcing</option>
+                      <option value="Complete interior styling">Complete interior styling</option>
+                    </select>
+                    <select aria-label="Project type" name="projectType" value={inquiryForm.projectType} onChange={updateInquiryForm}>
+                      <option value="">Project type</option>
+                      <option value="Home">Home</option>
+                      <option value="Apartment">Apartment</option>
+                      <option value="Office">Office</option>
+                      <option value="Shop / Showroom">Shop / Showroom</option>
+                      <option value="Restaurant / Cafe">Restaurant / Cafe</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <select aria-label="Budget range" name="budgetRange" value={inquiryForm.budgetRange} onChange={updateInquiryForm}>
+                      <option value="">Budget range</option>
+                      <option value="Under PKR 100k">Under PKR 100k</option>
+                      <option value="PKR 100k - 300k">PKR 100k - 300k</option>
+                      <option value="PKR 300k - 700k">PKR 300k - 700k</option>
+                      <option value="PKR 700k+">PKR 700k+</option>
+                      <option value="Need guidance">Need guidance</option>
+                    </select>
                   </div>
                   <textarea aria-label="Project message" name="message" value={inquiryForm.message} onChange={updateInquiryForm} placeholder="Share project dimensions, style direction, and budget range" required />
+                  <label className="inquiry-consent">
+                    <input name="consent" type="checkbox" checked={inquiryForm.consent} onChange={updateInquiryForm} required />
+                    <span>I agree that MTI may contact me about this inquiry.</span>
+                  </label>
                   <div className="button-row">
                     <button className="primary-action" type="submit">Send inquiry</button>
                     <a className="secondary-action" href={siteData.contact.whatsapp} rel="noreferrer" target="_blank">Chat on WhatsApp</a>

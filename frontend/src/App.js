@@ -660,13 +660,43 @@ function App() {
   async function handleInquirySubmit(event) {
     event.preventDefault();
     try {
-      const finalInquiryData = { ...inquiryForm, createdAt: new Date().toISOString() };
-      
-      await addDoc(collection(db, 'inquiries'), finalInquiryData);
+      const inquiryPhone = inquiryForm.phone?.trim() || '';
+      const inquiryEmail = inquiryForm.email?.trim() || '';
+
+      if (!inquiryPhone && !inquiryEmail) {
+        setStatusMessage((current) => ({ ...current, inquiry: 'Please add a phone number or email so we can reply.' }));
+        return;
+      }
+
+      if (!inquiryForm.consent) {
+        setStatusMessage((current) => ({ ...current, inquiry: 'Please confirm that MTI may contact you about this inquiry.' }));
+        return;
+      }
+
+      const inquiryRef = 'INQ-' + Math.floor(100000 + Math.random() * 900000);
+      const finalInquiryData = {
+        ...inquiryForm,
+        name: inquiryForm.name?.trim() || '',
+        email: inquiryEmail,
+        phone: inquiryPhone,
+        subject: inquiryForm.subject?.trim() || '',
+        serviceInterest: inquiryForm.serviceInterest?.trim() || '',
+        projectType: inquiryForm.projectType?.trim() || '',
+        budgetRange: inquiryForm.budgetRange?.trim() || '',
+        message: inquiryForm.message?.trim() || '',
+        reference: inquiryRef,
+        source: 'public-site',
+        status: 'new',
+        createdAt: new Date().toISOString(),
+      };
+
+      const docRef = await addDoc(collection(db, 'inquiries'), finalInquiryData);
+      const createdInquiry = { id: docRef.id, ...finalInquiryData };
+      setAdminData((current) => ({ ...current, inquiries: [createdInquiry, ...current.inquiries] }));
 
       setStatusMessage({
         booking: '',
-        inquiry: 'Inquiry sent successfully!'
+        inquiry: `Inquiry sent successfully. Reference: ${inquiryRef}`
       });
       setInquiryForm(inquiryDefaults);
 

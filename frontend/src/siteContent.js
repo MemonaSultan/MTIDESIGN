@@ -285,5 +285,10 @@ export const inquiryDefaults = {
   email: '',
   phone: '',
   subject: '',
+  serviceInterest: '',
+  projectType: '',
+  budgetRange: '',
+  preferredContact: 'WhatsApp',
   message: '',
+  consent: false,
 };
