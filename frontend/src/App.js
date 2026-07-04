@@ -302,6 +302,22 @@ function App() {
     setAuthPanelOpen(false);
   }
 
+  useEffect(() => {
+    if (!authPanelOpen) return undefined;
+
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape') closeAuthPanel();
+    };
+
+    document.body.classList.add('auth-modal-open');
+    window.addEventListener('keydown', handleEscapeKey);
+
+    return () => {
+      document.body.classList.remove('auth-modal-open');
+      window.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [authPanelOpen]);
+
   function isDefaultAdminLogin(email, password) {
     return email.trim().toLowerCase() === defaultAdminEmail && password === defaultAdminPassword;
   }
@@ -1045,156 +1061,169 @@ async function handleAdminLogin(event) {
       )}
 
       {authPanelOpen && (
-        <div className="auth-overlay" role="presentation">
-          <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-            <button className="auth-close" type="button" onClick={closeAuthPanel} aria-label="Close sign in panel">x</button>
+        <div className="signin-overlay" role="presentation" onMouseDown={closeAuthPanel}>
+          <section
+            className="signin-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="auth-title"
+            aria-describedby="auth-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="signin-close" type="button" onClick={closeAuthPanel} aria-label="Close sign in panel">X</button>
 
-            <div className="auth-split-container">
-
-              {/* LEFT PANEL */}
-              <div className="auth-left-panel">
-                <div className="brand-badge">
-                  <div className="brand-monogram-small">MTI</div>
+            <div className="signin-visual" style={{ backgroundImage: `linear-gradient(140deg, rgba(27, 17, 12, 0.38), rgba(47, 27, 18, 0.82)), url(${brandAssets.showroom})` }}>
+              <div className="signin-brand">
+                <div className="signin-logo">MTI</div>
+                <div>
+                  <strong>MTI Interiors</strong>
                   <span>Client Portal</span>
                 </div>
-                <div className="auth-brand-content">
-                  <h1 className="animated-hero-text">
-                    Your design journey,
-                    <span className="italic-accent"> organized.</span>
-                  </h1>
-                  <p className="brand-subtext">
-                    Sign in to manage consultations, update your contact details, and keep project conversations close at hand.
-                  </p>
-                  <div className="auth-benefit-list" aria-label="Account benefits">
-                    <span>Fast Google or email access</span>
-                    <span>Saved client profile</span>
-                    <span>Easy consultation follow-up</span>
-                  </div>
-                </div>
-                <p className="auth-footer-copy">(c) 2026 MTI Interiors. Made to Inspire.</p>
               </div>
 
-              {/* RIGHT PANEL */}
-              <div className="auth-right-panel">
-                <div className="form-wrapper-animated">
-                  <div className="auth-header-block">
-                    <p className="section-tag">Secure Access</p>
-                    <h2 id="auth-title">{authMode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
-                    <p className="auth-subtitle">
-                      {authMode === 'login'
-                        ? 'Use one login for everyone. Admin accounts open the dashboard, client accounts open the portal.'
-                        : 'Create a client account so MTI can keep your project details in one place.'}
-                    </p>
-                  </div>
+              <div className="signin-visual-copy">
+                <p className="signin-kicker">Made to Inspire</p>
+                <h1>Your design journey, beautifully managed.</h1>
+                <p>
+                  Review consultations, keep your profile current, and continue conversations with the MTI team from one polished place.
+                </p>
+              </div>
 
-                  <div className="auth-mode-tabs" role="tablist" aria-label="Choose sign in mode">
-                    <button
-                      type="button"
-                      className={authMode === 'login' ? 'is-active' : ''}
-                      onClick={() => {
-                        setAuthMode('login');
-                        setUserFeedback({});
-                      }}
-                    >
-                      Sign in
-                    </button>
-                    <button
-                      type="button"
-                      className={authMode === 'register' ? 'is-active' : ''}
-                      onClick={() => {
-                        setAuthMode('register');
-                        setUserFeedback({});
-                      }}
-                    >
-                      Create account
-                    </button>
-                  </div>
+              <div className="signin-trust-row" aria-label="Account benefits">
+                <span>Secure access</span>
+                <span>Saved profile</span>
+                <span>Fast follow-up</span>
+              </div>
+            </div>
 
+            <div className="signin-panel">
+              <div className="signin-form-shell">
+                <div className="signin-header">
+                  <p className="signin-kicker">Secure Access</p>
+                  <h2 id="auth-title">{authMode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
+                  <p id="auth-description">
+                    {authMode === 'login'
+                      ? 'Sign in to open your client portal or admin dashboard.'
+                      : 'Set up your client profile and keep project details organized.'}
+                  </p>
+                </div>
+
+                <div className="signin-tabs" role="tablist" aria-label="Choose sign in mode">
                   <button
                     type="button"
-                    className="google-auth-btn-modern"
-                    onClick={handleGoogleSignIn}
-                    disabled={googleLoading}
+                    className={authMode === 'login' ? 'is-active' : ''}
+                    role="tab"
+                    aria-selected={authMode === 'login'}
+                    onClick={() => {
+                      setAuthMode('login');
+                      setUserFeedback({});
+                    }}
                   >
-                    <img src="https://www.svgrepo.com/show/355037/google-icon.svg" className="google-icon-svg" alt="Google" />
-                    {googleLoading ? 'Opening Google...' : 'Continue with Google'}
+                    Sign in
                   </button>
+                  <button
+                    type="button"
+                    className={authMode === 'register' ? 'is-active' : ''}
+                    role="tab"
+                    aria-selected={authMode === 'register'}
+                    onClick={() => {
+                      setAuthMode('register');
+                      setUserFeedback({});
+                    }}
+                  >
+                    Create account
+                  </button>
+                </div>
 
-                  <div className="auth-divider-modern">
-                    <span>or email</span>
+                <button
+                  type="button"
+                  className="signin-google"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading}
+                >
+                  <img src="https://www.svgrepo.com/show/355037/google-icon.svg" className="signin-google-icon" alt="" />
+                  {googleLoading ? 'Opening Google...' : 'Continue with Google'}
+                </button>
+
+                <div className="signin-divider">
+                  <span>or email</span>
+                </div>
+
+                <form onSubmit={handleUserAuthSubmit} className="signin-form">
+                  {authMode === 'register' && (
+                    <div className="signin-two-fields">
+                      <div className="signin-field">
+                        <label htmlFor="auth-name">Full Name</label>
+                        <input
+                          id="auth-name"
+                          type="text"
+                          value={userAuth.name}
+                          onChange={(e) => setUserAuth({ ...userAuth, name: e.target.value })}
+                          required
+                          autoComplete="name"
+                          placeholder="Your full name"
+                        />
+                      </div>
+                      <div className="signin-field">
+                        <label htmlFor="auth-phone">Phone Number</label>
+                        <input
+                          id="auth-phone"
+                          type="tel"
+                          value={userAuth.phone}
+                          onChange={(e) => setUserAuth({ ...userAuth, phone: e.target.value })}
+                          autoComplete="tel"
+                          inputMode="tel"
+                          placeholder="+92 300 1234567"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="signin-field">
+                    <label htmlFor="auth-email">Email Address</label>
+                    <input
+                      id="auth-email"
+                      type="email"
+                      value={userAuth.email}
+                      onChange={(e) => setUserAuth({ ...userAuth, email: e.target.value })}
+                      required
+                      autoComplete="email"
+                      inputMode="email"
+                      placeholder="you@example.com"
+                    />
                   </div>
 
-                  <form onSubmit={handleUserAuthSubmit} className="auth-form-modern">
-                    {authMode === 'register' && (
-                      <>
-                        <div className="form-field-modern animate-fade-in">
-                          <label>Full Name</label>
-                          <input
-                            type="text"
-                            value={userAuth.name}
-                            onChange={(e) => setUserAuth({ ...userAuth, name: e.target.value })}
-                            required
-                            autoComplete="name"
-                            placeholder="Your full name"
-                          />
-                        </div>
-                        <div className="form-field-modern animate-fade-in">
-                          <label>Phone Number</label>
-                          <input
-                            type="tel"
-                            value={userAuth.phone}
-                            onChange={(e) => setUserAuth({ ...userAuth, phone: e.target.value })}
-                            autoComplete="tel"
-                            placeholder="+92 300 1234567"
-                          />
-                        </div>
-                      </>
-                    )}
+                  <div className="signin-field">
+                    <label htmlFor="auth-password">Password</label>
+                    <input
+                      id="auth-password"
+                      type="password"
+                      value={userAuth.password}
+                      onChange={(e) => setUserAuth({ ...userAuth, password: e.target.value })}
+                      required
+                      minLength={authMode === 'register' ? 6 : undefined}
+                      autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                      placeholder={authMode === 'login' ? 'Enter your password' : 'At least 6 characters'}
+                    />
+                  </div>
 
-                    <div className="form-field-modern">
-                      <label>Email Address</label>
-                      <input
-                        type="email"
-                        value={userAuth.email}
-                        onChange={(e) => setUserAuth({ ...userAuth, email: e.target.value })}
-                        required
-                        autoComplete="email"
-                        placeholder="you@example.com"
-                      />
-                    </div>
+                  {userFeedback.auth && <p className="signin-error">{userFeedback.auth}</p>}
 
-                    <div className="form-field-modern">
-                      <label>Password</label>
-                      <input
-                        type="password"
-                        value={userAuth.password}
-                        onChange={(e) => setUserAuth({ ...userAuth, password: e.target.value })}
-                        required
-                        minLength={authMode === 'register' ? 6 : undefined}
-                        autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
-                        placeholder={authMode === 'login' ? 'Enter your password' : 'At least 6 characters'}
-                      />
-                    </div>
+                  <button type="submit" className="signin-submit" disabled={authSubmitting}>
+                    {authSubmitting
+                      ? 'Please wait...'
+                      : authMode === 'login'
+                        ? 'Sign in securely'
+                        : 'Create account'}
+                  </button>
+                </form>
 
-                    {userFeedback.auth && <p className="auth-error-msg-modern">{userFeedback.auth}</p>}
-
-                    <button type="submit" className="auth-submit-btn-modern" disabled={authSubmitting}>
-                      {authSubmitting
-                        ? 'Please wait...'
-                        : authMode === 'login'
-                          ? 'Sign in'
-                          : 'Create account'}
-                    </button>
-                  </form>
-
-                  <p className="auth-panel-note">
-                    {authMode === 'login'
-                      ? 'New here? Choose Create account above and we will set up your client profile.'
-                      : 'Already registered? Choose Sign in above to continue.'}
-                  </p>
-                </div>
+                <p className="signin-note">
+                  {authMode === 'login'
+                    ? 'New to MTI? Create an account and we will prepare your client space.'
+                    : 'Already registered? Sign in to continue your project journey.'}
+                </p>
               </div>
-
             </div>
           </section>
         </div>
