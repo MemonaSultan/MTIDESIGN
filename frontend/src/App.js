@@ -33,8 +33,18 @@ const defaultAdminSettings = {
     siteTitle: 'MTI Professional Interiors and Decor',
     keywords: 'interior design, decor, furniture, Pakistan',
     metaDescription: 'Premium interior design, decor, consultation, and catalog services from MTI.',
+    focusKeyword: 'interior design Pakistan',
+    localArea: 'Pakistan',
     canonicalUrl: '',
     ogImage: '',
+    ogTitle: '',
+    ogDescription: '',
+    twitterHandle: '',
+    googleSiteVerification: '',
+    analyticsId: '',
+    sitemapUrl: '',
+    robotsIndex: true,
+    robotsFollow: true,
   },
   appearance: {
     primaryColor: '#2f1b12',
@@ -160,6 +170,48 @@ function App() {
 
   const deferredProjectSearch = useDeferredValue(projectSearch);
   const deferredProductSearch = useDeferredValue(productSearch);
+
+  useEffect(() => {
+    const seo = normalizeAdminSettings(adminData.settings).seo;
+    const setMeta = (attribute, key, content) => {
+      if (!content && key !== 'robots') return;
+      let element = document.head.querySelector(`meta[${attribute}="${key}"]`);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attribute, key);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', content);
+    };
+    const setCanonical = (href) => {
+      let link = document.head.querySelector('link[rel="canonical"]');
+      if (!href) {
+        if (link) link.remove();
+        return;
+      }
+      if (!link) {
+        link = document.createElement('link');
+        link.setAttribute('rel', 'canonical');
+        document.head.appendChild(link);
+      }
+      link.setAttribute('href', href);
+    };
+
+    document.title = seo.siteTitle || defaultAdminSettings.seo.siteTitle;
+    setMeta('name', 'description', seo.metaDescription);
+    setMeta('name', 'keywords', seo.keywords);
+    setMeta('name', 'robots', `${seo.robotsIndex === false ? 'noindex' : 'index'}, ${seo.robotsFollow === false ? 'nofollow' : 'follow'}`);
+    setMeta('name', 'google-site-verification', seo.googleSiteVerification);
+    setMeta('property', 'og:title', seo.ogTitle || seo.siteTitle);
+    setMeta('property', 'og:description', seo.ogDescription || seo.metaDescription);
+    setMeta('property', 'og:image', seo.ogImage);
+    setMeta('property', 'og:type', 'website');
+    setMeta('name', 'twitter:card', seo.ogImage ? 'summary_large_image' : 'summary');
+    setMeta('name', 'twitter:title', seo.ogTitle || seo.siteTitle);
+    setMeta('name', 'twitter:description', seo.ogDescription || seo.metaDescription);
+    setMeta('name', 'twitter:site', seo.twitterHandle);
+    setCanonical(seo.canonicalUrl);
+  }, [adminData.settings]);
 
   // Helper function to fetch all docs from a collection
   const fetchCollection = async (collectionName) => {

@@ -211,6 +211,9 @@ function AdminPanel(props) {
       },
     }));
   };
+  const seoTitle = settings.seo.siteTitle || '';
+  const seoDescription = settings.seo.metaDescription || '';
+  const seoRobots = `${settings.seo.robotsIndex === false ? 'noindex' : 'index'}, ${settings.seo.robotsFollow === false ? 'nofollow' : 'follow'}`;
   const recentBookings = adminData.overview?.recentBookings || adminData.bookings.slice(0, 5);
   const recentInquiries = adminData.overview?.recentInquiries || adminData.inquiries.slice(0, 5);
   const overviewMetrics = adminData.overview?.metrics || [
@@ -487,10 +490,37 @@ function AdminPanel(props) {
               <p className="section-tag">SEO</p>
               <div className="admin-form-grid">
                 <FieldControl field={{ label: 'Site title' }} value={settings.seo.siteTitle} onChange={(value) => updateSettingsGroup('seo', 'siteTitle', value)} />
+                <FieldControl field={{ label: 'Focus keyword' }} value={settings.seo.focusKeyword} onChange={(value) => updateSettingsGroup('seo', 'focusKeyword', value)} />
+                <FieldControl field={{ label: 'Service area' }} value={settings.seo.localArea} onChange={(value) => updateSettingsGroup('seo', 'localArea', value)} />
                 <FieldControl field={{ label: 'Keywords' }} value={settings.seo.keywords} onChange={(value) => updateSettingsGroup('seo', 'keywords', value)} />
                 <FieldControl field={{ label: 'Canonical URL', type: 'url' }} value={settings.seo.canonicalUrl} onChange={(value) => updateSettingsGroup('seo', 'canonicalUrl', value)} />
+                <FieldControl field={{ label: 'Sitemap URL', type: 'url' }} value={settings.seo.sitemapUrl} onChange={(value) => updateSettingsGroup('seo', 'sitemapUrl', value)} />
                 <FieldControl field={{ label: 'Social Share Image', type: 'image' }} value={settings.seo.ogImage} onChange={(value) => updateSettingsGroup('seo', 'ogImage', value)} />
                 <FieldControl field={{ label: 'Meta description', type: 'textarea' }} value={settings.seo.metaDescription} onChange={(value) => updateSettingsGroup('seo', 'metaDescription', value)} />
+                <FieldControl field={{ label: 'Social title' }} value={settings.seo.ogTitle} onChange={(value) => updateSettingsGroup('seo', 'ogTitle', value)} />
+                <FieldControl field={{ label: 'Social description', type: 'textarea' }} value={settings.seo.ogDescription} onChange={(value) => updateSettingsGroup('seo', 'ogDescription', value)} />
+                <FieldControl field={{ label: 'Twitter handle' }} value={settings.seo.twitterHandle} onChange={(value) => updateSettingsGroup('seo', 'twitterHandle', value)} />
+                <FieldControl field={{ label: 'Google verification code' }} value={settings.seo.googleSiteVerification} onChange={(value) => updateSettingsGroup('seo', 'googleSiteVerification', value)} />
+                <FieldControl field={{ label: 'Analytics ID' }} value={settings.seo.analyticsId} onChange={(value) => updateSettingsGroup('seo', 'analyticsId', value)} />
+                <FieldControl field={{ label: 'Allow indexing', type: 'checkbox' }} value={settings.seo.robotsIndex} onChange={(value) => updateSettingsGroup('seo', 'robotsIndex', value)} />
+                <FieldControl field={{ label: 'Allow link following', type: 'checkbox' }} value={settings.seo.robotsFollow} onChange={(value) => updateSettingsGroup('seo', 'robotsFollow', value)} />
+              </div>
+              <div className="seo-preview-grid">
+                <article>
+                  <span>Search title</span>
+                  <strong>{seoTitle || 'MTI Professional Interiors and Decor'}</strong>
+                  <small>{seoTitle.length}/60 characters</small>
+                </article>
+                <article>
+                  <span>Search description</span>
+                  <p>{seoDescription || 'Premium interior design, decor, consultation, and catalog services from MTI.'}</p>
+                  <small>{seoDescription.length}/160 characters</small>
+                </article>
+                <article>
+                  <span>Robots</span>
+                  <strong>{seoRobots}</strong>
+                  <small>{settings.seo.canonicalUrl || 'Canonical URL not set'}</small>
+                </article>
               </div>
             </section>
 
