@@ -603,10 +603,25 @@ function App() {
   function getFriendlyDataError(error, action = 'save this change') {
     const message = error?.message || '';
     if (error?.code === 'permission-denied' || message.toLowerCase().includes('missing or insufficient permissions')) {
-      return `Firebase backend rules are blocking this admin action. Deploy the included Firestore rules, then login again and ${action}.`;
+      return `Firebase backend rules are blocking this admin action. Ask the super admin to recreate/save this admin account once, then logout, login again, and ${action}.`;
     }
 
     return message || 'This admin action could not be completed.';
+  }
+
+  async function repairAdminRoleProfile(firebaseUser, staffAccount) {
+    if (!firebaseUser || !staffAccount) return null;
+
+    const profile = buildBackendUserProfile({
+      ...staffAccount,
+      email: firebaseUser.email || staffAccount.email,
+      role: staffAccount.role || 'admin',
+      status: staffAccount.status || 'active',
+      permissions: staffAccount.permissions || 'Site management',
+    }, firebaseUser.uid);
+
+    await setDoc(doc(db, 'users', firebaseUser.uid), profile, { merge: true });
+    return profile;
   }
 
   async function routeSignedInUser(firebaseUser, profileFallback = {}, options = {}) {
@@ -950,6 +965,23 @@ function App() {
     } catch (error) {
       const localStaffAccount = findLocalStaffLogin(adminAuth.email, adminAuth.password);
       if (localStaffAccount) {
+        if (auth.currentUser?.email?.trim().toLowerCase() === localStaffAccount.email?.trim().toLowerCase()) {
+          try {
+            const repairedProfile = await repairAdminRoleProfile(auth.currentUser, localStaffAccount);
+            await routeSignedInUser(auth.currentUser, repairedProfile, { requireAdmin: true });
+            setAdminFeedback((current) => ({
+              ...current,
+              auth: 'Admin profile restored in Firebase. Backend actions are ready now.',
+            }));
+            return;
+          } catch (repairError) {
+            setAdminFeedback((current) => ({
+              ...current,
+              auth: getFriendlyDataError(repairError, 'use admin backend actions'),
+            }));
+            return;
+          }
+        }
         buildAdminSession(localStaffAccount);
         return;
       }
