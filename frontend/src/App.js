@@ -595,6 +595,7 @@ function App() {
       'mti/existing-email-password-mismatch': 'This email already exists in Firebase with a different password. Use the existing Firebase password or create admin with a different email.',
       'mti/not-admin': 'This account is a client account. Please use an admin email and password for the admin panel.',
       'mti/staff-suspended': 'This staff account is suspended. Please contact the super admin.',
+      'mti/backend-admin-auth-required': 'This admin session needs a Firebase login before backend actions can run. Logout, then login again with the admin email and password.',
     };
 
     return messageMap[error?.code] || `${error?.code || 'auth/error'}: ${error?.message || 'Sign in could not be completed.'}`;
@@ -602,8 +603,12 @@ function App() {
 
   function getFriendlyDataError(error, action = 'save this change') {
     const message = error?.message || '';
+    if (error?.code === 'mti/backend-admin-auth-required') {
+      return getFriendlyAuthError(error);
+    }
+
     if (error?.code === 'permission-denied' || message.toLowerCase().includes('missing or insufficient permissions')) {
-      return `Firebase backend rules are blocking this admin action. Ask the super admin to recreate/save this admin account once, then logout, login again, and ${action}.`;
+      return `Firebase backend rules are still blocking this admin action. Publish the latest Firestore rules, then logout, login again, and ${action}.`;
     }
 
     return message || 'This admin action could not be completed.';
@@ -622,6 +627,58 @@ function App() {
 
     await setDoc(doc(db, 'users', firebaseUser.uid), profile, { merge: true });
     return profile;
+  }
+
+  function findLocalStaffByEmail(email = '') {
+    const normalizedEmail = email.trim().toLowerCase();
+    return getLocalStaffAccounts().find(
+      (account) => account.email?.trim().toLowerCase() === normalizedEmail
+    );
+  }
+
+  async function ensureAdminBackendReady(actionLabel = 'use backend actions') {
+    const sessionUser = adminSession.user;
+    if (!sessionUser || !['admin', 'superadmin'].includes(sessionUser.role)) {
+      const error = new Error('No admin session is active.');
+      error.code = 'mti/not-admin';
+      throw error;
+    }
+
+    if (sessionUser.role === 'superadmin') return auth.currentUser;
+
+    const sessionEmail = sessionUser.email?.trim().toLowerCase();
+    const staffAccount = findLocalStaffByEmail(sessionEmail) || sessionUser;
+    let firebaseUser = auth.currentUser;
+
+    if (firebaseUser?.email?.trim().toLowerCase() !== sessionEmail) {
+      if (!staffAccount.password) {
+        const error = new Error(`Admin Firebase login is required before you can ${actionLabel}.`);
+        error.code = 'mti/backend-admin-auth-required';
+        throw error;
+      }
+
+      const credential = await signInWithEmailAndPassword(auth, sessionEmail, staffAccount.password);
+      firebaseUser = credential.user;
+    }
+
+    const profileDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+    const profile = profileDoc.exists() ? profileDoc.data() : {};
+    if (profile.role !== 'admin' || profile.status === 'suspended') {
+      const repairedProfile = await repairAdminRoleProfile(firebaseUser, {
+        ...staffAccount,
+        role: 'admin',
+        status: staffAccount.status || 'active',
+      });
+      const repairedSession = normalizeAdminSession({
+        ...adminSession,
+        token: await firebaseUser.getIdToken(),
+        user: { ...sessionUser, ...repairedProfile, id: firebaseUser.uid },
+      });
+      setAdminSession(repairedSession);
+      window.localStorage.setItem(authStorageKey, JSON.stringify(repairedSession));
+    }
+
+    return firebaseUser;
   }
 
   async function routeSignedInUser(firebaseUser, profileFallback = {}, options = {}) {
@@ -1038,6 +1095,9 @@ function App() {
           return;
         }
       }
+      if (resourceKey !== 'superadmin') {
+        await ensureAdminBackendReady(`add ${config.title.toLowerCase()}`);
+      }
       let createdItem;
 
       if (resourceKey === 'superadmin') {
@@ -1085,6 +1145,9 @@ function App() {
     try {
       const { id, ...cleanData } = item;
       if (!validateAdminCollectionItem(resourceKey, item, config)) return;
+      if (resourceKey !== 'superadmin') {
+        await ensureAdminBackendReady(`save ${config.title.toLowerCase()}`);
+      }
       if (!String(id).startsWith('local-') && id !== 'default-superadmin') {
         await setDoc(doc(db, config.collection, id), cleanData, { merge: true });
       }
@@ -1111,6 +1174,9 @@ function App() {
       const config = collectionConfigs[resourceKey];
       const dataKey = resourceKey === 'superadmin' ? 'users' : resourceKey;
     try {
+      if (resourceKey !== 'superadmin') {
+        await ensureAdminBackendReady(`delete ${config.title.toLowerCase()}`);
+      }
       if (!String(itemId).startsWith('local-') && itemId !== 'default-superadmin') {
         await deleteDoc(doc(db, config.collection, itemId));
       }
@@ -1137,6 +1203,7 @@ function App() {
   // Direct Admin Save Process for Simple Records (Bookings/Reviews/Inquiries)
   async function saveSimpleRecord(groupKey, endpoint, item) {
     try {
+      await ensureAdminBackendReady(`save this ${groupKey.slice(0, -1)} record`);
       const { id, ...cleanData } = item;
       await setDoc(doc(db, endpoint, id), cleanData, { merge: true });
 
@@ -1152,6 +1219,7 @@ function App() {
   // Direct Admin Simple Record Deletion Flows
   async function deleteSimpleRecord(groupKey, endpoint, itemId) {
     try {
+      await ensureAdminBackendReady(`delete this ${groupKey.slice(0, -1)} record`);
       await deleteDoc(doc(db, endpoint, itemId));
       const nextItems = adminData[groupKey].filter((item) => item.id !== itemId);
       setAdminData((current) => ({ ...current, [groupKey]: nextItems }));
@@ -1165,6 +1233,7 @@ function App() {
   // Save Content Management Updates Directly into centralized Firestore Document
   async function saveContent() {
     try {
+      await ensureAdminBackendReady('save site content');
       const nextContent = normalizeAdminContent(adminData.content);
       await setDoc(doc(db, 'config', 'content'), nextContent, { merge: true });
       setSiteData((current) => ({
@@ -1183,6 +1252,7 @@ function App() {
   // Save Admin Application Settings Directly into Firestore
   async function saveSettings() {
     try {
+      await ensureAdminBackendReady('save settings');
       const nextSettings = normalizeAdminSettings(adminData.settings);
       await setDoc(doc(db, 'config', 'settings'), nextSettings, { merge: true });
       setAdminData((current) => ({ ...current, settings: nextSettings }));
