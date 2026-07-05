@@ -301,6 +301,70 @@
   }
 }
 
+@keyframes mtiFloatChip {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.hero-service-float {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 250, 244, 0.76)),
+    radial-gradient(circle at 12% 20%, rgba(198, 149, 79, 0.18), transparent 34%);
+  border: 1px solid rgba(166, 118, 63, 0.16);
+  border-radius: 8px;
+  box-shadow: 0 18px 46px rgba(58, 34, 22, 0.1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 18px;
+}
+
+.hero-service-float span {
+  animation: mtiFloatChip 3.6s ease-in-out infinite;
+  background: #ffffff;
+  border: 1px solid rgba(166, 118, 63, 0.16);
+  border-radius: 999px;
+  color: var(--wood-800);
+  font-size: 0.84rem;
+  font-weight: 900;
+  padding: 10px 14px;
+}
+
+.hero-service-float span:nth-child(2n) {
+  animation-delay: 380ms;
+}
+
+.hero-service-float span:nth-child(3n) {
+  animation-delay: 760ms;
+}
+
+@media (max-width: 560px) {
+  .hero-service-float {
+    flex-wrap: nowrap;
+    margin-left: -14px;
+    margin-right: -14px;
+    overflow-x: auto;
+    padding-left: 14px;
+    padding-right: 14px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .hero-service-float::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hero-service-float span {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+}
+
 .utility-bar,
 .site-header,
 .app-shell,

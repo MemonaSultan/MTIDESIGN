@@ -65,15 +65,11 @@ function PublicSite({
               </div>
             </article>
 
-            <article className="brand-card">
-              <img alt="MTI Interiors and Decor business identity" src={brandAssets.identity} />
-              <div className="brand-card-copy">
-                <span>Professional brand language</span>
-                <p>
-                  {siteData.home.offer.title}. {siteData.home.offer.description}
-                </p>
-              </div>
-            </article>
+            <div className="hero-service-float" aria-label="MTI service highlights">
+              {['Curtains', 'Blinds', 'Wallpaper', 'Flooring', 'Furniture', 'Decor'].map((service) => (
+                <span key={service}>{service}</span>
+              ))}
+            </div>
           </div>
         </section>
 
