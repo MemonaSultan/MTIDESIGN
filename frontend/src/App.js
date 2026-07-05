@@ -27,19 +27,25 @@ function isDefaultAdminEmail(email = '') {
 }
 
 function normalizeAdminSession(session) {
-  if (!session?.user || !isDefaultAdminEmail(session.user.email)) return session;
+  if (!session?.user) return session;
 
+  const isDefaultAdmin = isDefaultAdminEmail(session.user.email);
+  const role = isDefaultAdmin ? 'superadmin' : session.user.role;
+  const isAdminAccount = role === 'admin' || role === 'superadmin';
+  if (!isAdminAccount) return session;
+
+  const displayName = role === 'superadmin' ? 'Super Admin' : 'Admin';
   return {
     ...session,
     user: {
       ...session.user,
-      id: session.user.id || 'default-superadmin',
-      name: 'Super Admin',
-      email: defaultAdminEmail,
-      role: 'superadmin',
+      id: session.user.id || (isDefaultAdmin ? 'default-superadmin' : session.user.email),
+      name: displayName,
+      email: isDefaultAdmin ? defaultAdminEmail : session.user.email,
+      role,
       status: 'active',
-      permissions: 'Full business control',
-      department: 'Management',
+      permissions: role === 'superadmin' ? 'Full business control' : session.user.permissions || 'Site management',
+      department: role === 'superadmin' ? 'Management' : session.user.department || 'Operations',
     },
   };
 }
