@@ -594,6 +594,15 @@ function App() {
     return messageMap[error?.code] || `${error?.code || 'auth/error'}: ${error?.message || 'Sign in could not be completed.'}`;
   }
 
+  function getFriendlyDataError(error, action = 'save this change') {
+    const message = error?.message || '';
+    if (error?.code === 'permission-denied' || message.toLowerCase().includes('missing or insufficient permissions')) {
+      return `Firebase backend rules are blocking this admin action. Deploy the included Firestore rules, then login again and ${action}.`;
+    }
+
+    return message || 'This admin action could not be completed.';
+  }
+
   async function routeSignedInUser(firebaseUser, profileFallback = {}, options = {}) {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDoc = await getDoc(userDocRef);
@@ -1027,7 +1036,7 @@ function App() {
         setAdminFeedback((current) => ({ ...current, superadmin: `Firebase account could not be created: ${getFriendlyAuthError(error)}` }));
         return;
       }
-      setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));
+      setAdminFeedback((current) => ({ ...current, [resourceKey]: getFriendlyDataError(error, `add ${config.title.toLowerCase()}`) }));
     }
   }
 
@@ -1055,7 +1064,7 @@ function App() {
       syncPublicState(dataKey, nextItems);
       setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} item saved successfully.` }));
     } catch (error) {
-      setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));
+      setAdminFeedback((current) => ({ ...current, [resourceKey]: getFriendlyDataError(error, `save ${config.title.toLowerCase()}`) }));
     }
   }
 
@@ -1076,7 +1085,7 @@ function App() {
       syncPublicState(dataKey, nextItems);
       setAdminFeedback((current) => ({ ...current, [resourceKey]: `${config.title} element permanently deleted.` }));
     } catch (error) {
-      setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));
+      setAdminFeedback((current) => ({ ...current, [resourceKey]: getFriendlyDataError(error, `delete ${config.title.toLowerCase()}`) }));
     }
   }
 
@@ -1098,7 +1107,7 @@ function App() {
       if (groupKey === 'reviews') syncPublicState('reviews', nextItems);
       setAdminFeedback((current) => ({ ...current, [groupKey]: 'Record updated in Firebase.' }));
     } catch (error) {
-      setAdminFeedback((current) => ({ ...current, [groupKey]: error.message }));
+      setAdminFeedback((current) => ({ ...current, [groupKey]: getFriendlyDataError(error, `save this ${groupKey.slice(0, -1)} record`) }));
     }
   }
 
@@ -1111,7 +1120,7 @@ function App() {
       if (groupKey === 'reviews') syncPublicState('reviews', nextItems);
       setAdminFeedback((current) => ({ ...current, [groupKey]: 'Record removed.' }));
     } catch (error) {
-      setAdminFeedback((current) => ({ ...current, [groupKey]: error.message }));
+      setAdminFeedback((current) => ({ ...current, [groupKey]: getFriendlyDataError(error, `delete this ${groupKey.slice(0, -1)} record`) }));
     }
   }
 
@@ -1129,7 +1138,7 @@ function App() {
       setAdminData((current) => ({ ...current, content: nextContent }));
       setAdminFeedback((current) => ({ ...current, content: 'Global public site copy saved to Firestore.' }));
     } catch (error) {
-      setAdminFeedback((current) => ({ ...current, content: error.message }));
+      setAdminFeedback((current) => ({ ...current, content: getFriendlyDataError(error, 'save site content') }));
     }
   }
 
@@ -1141,7 +1150,7 @@ function App() {
       setAdminData((current) => ({ ...current, settings: nextSettings }));
       setAdminFeedback((current) => ({ ...current, settings: 'System settings synced online.' }));
     } catch (error) {
-      setAdminFeedback((current) => ({ ...current, settings: error.message }));
+      setAdminFeedback((current) => ({ ...current, settings: getFriendlyDataError(error, 'save settings') }));
     }
   }
 
