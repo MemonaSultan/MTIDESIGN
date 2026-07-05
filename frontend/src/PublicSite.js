@@ -498,6 +498,18 @@ function PublicSite({
         </section>
       </main>
 
+      <nav className="mobile-action-bar" aria-label="Quick contact actions">
+        <a href={`tel:+92${siteData.contact.primaryPhone.replace(/\D/g, '')}`}>
+          <span>Call</span>
+        </a>
+        <a href={siteData.contact.whatsapp} rel="noreferrer" target="_blank">
+          <span>WhatsApp</span>
+        </a>
+        <a href="#consultation">
+          <span>Book</span>
+        </a>
+      </nav>
+
       <footer className="site-footer">
         <div className="footer-block">
           <strong>MTI Interiors & Decor</strong>
