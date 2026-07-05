@@ -11,7 +11,7 @@ import UserPortal from './UserPortal';
 import { deleteApp, initializeApp } from 'firebase/app';
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { 
-  collection, doc, setDoc, addDoc, getDocs, getDoc, deleteDoc, query 
+  collection, doc, setDoc, addDoc, getDocs, getDoc, deleteDoc, query, getFirestore
 } from 'firebase/firestore'; 
 
 // Humaray apnay config exports
@@ -22,6 +22,28 @@ const userStorageKey = 'mti-user-session';
 const staffStorageKey = 'mti-staff-accounts';
 const defaultAdminEmail = 'admin@mtiinteriors.com';
 const defaultAdminPassword = 'Admin123!';
+function isDefaultAdminEmail(email = '') {
+  return email.trim().toLowerCase() === defaultAdminEmail;
+}
+
+function normalizeAdminSession(session) {
+  if (!session?.user || !isDefaultAdminEmail(session.user.email)) return session;
+
+  return {
+    ...session,
+    user: {
+      ...session.user,
+      id: session.user.id || 'default-superadmin',
+      name: 'Super Admin',
+      email: defaultAdminEmail,
+      role: 'superadmin',
+      status: 'active',
+      permissions: 'Full business control',
+      department: 'Management',
+    },
+  };
+}
+
 const defaultAdminContent = {
   home: fallbackSiteState.home,
   about: fallbackSiteState.about,
@@ -328,7 +350,11 @@ function App() {
     if (storedAdmin) {
       try {
         const parsed = JSON.parse(storedAdmin);
-        if (parsed.token) setAdminSession(parsed);
+        if (parsed.token) {
+          const normalizedAdmin = normalizeAdminSession(parsed);
+          setAdminSession(normalizedAdmin);
+          window.localStorage.setItem(authStorageKey, JSON.stringify(normalizedAdmin));
+        }
       } catch (error) {
         window.localStorage.removeItem(authStorageKey);
       }
@@ -410,7 +436,7 @@ function App() {
   }
 
   function buildAdminSession(account) {
-    const session = {
+    const session = normalizeAdminSession({
       token: `local-${account.role}-session`,
       user: {
         id: account.id,
@@ -420,7 +446,7 @@ function App() {
         phone: account.phone || '',
         status: account.status || 'active',
       },
-    };
+    });
 
     window.localStorage.removeItem(userStorageKey);
     window.localStorage.setItem(authStorageKey, JSON.stringify(session));
@@ -514,10 +540,19 @@ function App() {
         credential = await createUserWithEmailAndPassword(secondaryAuth, account.email, account.password);
       } catch (error) {
         if (error.code !== 'auth/email-already-in-use') throw error;
-        credential = await signInWithEmailAndPassword(secondaryAuth, account.email, account.password);
+        try {
+          credential = await signInWithEmailAndPassword(secondaryAuth, account.email, account.password);
+        } catch {
+          const existingEmailError = new Error('This email already exists in Firebase with a different password.');
+          existingEmailError.code = 'mti/existing-email-password-mismatch';
+          throw existingEmailError;
+        }
       }
 
-      return credential.user;
+      const profile = buildBackendUserProfile(account, credential.user.uid);
+      const secondaryDb = getFirestore(secondaryApp);
+      await setDoc(doc(secondaryDb, 'users', credential.user.uid), profile, { merge: true });
+      return { user: credential.user, profile };
     } finally {
       try {
         await signOut(secondaryAuth);
@@ -546,19 +581,26 @@ function App() {
       'auth/user-not-found': 'No account was found for this email. You can create one below.',
       'auth/weak-password': 'Please use a stronger password with at least 6 characters.',
       'auth/wrong-password': 'The password is incorrect. Please try again.',
+      'auth/configuration-not-found': 'Firebase Authentication is not configured for this project.',
+      'auth/operation-not-allowed': 'Email/password sign-in is disabled in Firebase Authentication.',
+      'auth/admin-restricted-operation': 'Firebase blocked this account creation from the client app.',
+      'auth/network-request-failed': 'Network error. Please check internet connection and try again.',
+      'permission-denied': 'Firestore rules blocked saving the admin role profile. Allow authenticated users/admins to write users/{uid}.',
+      'mti/existing-email-password-mismatch': 'This email already exists in Firebase with a different password. Use the existing Firebase password or create admin with a different email.',
       'mti/not-admin': 'This account is a client account. Please use an admin email and password for the admin panel.',
       'mti/staff-suspended': 'This staff account is suspended. Please contact the super admin.',
     };
 
-    return messageMap[error?.code] || 'Sign in could not be completed. Please try again.';
+    return messageMap[error?.code] || `${error?.code || 'auth/error'}: ${error?.message || 'Sign in could not be completed.'}`;
   }
 
   async function routeSignedInUser(firebaseUser, profileFallback = {}, options = {}) {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDoc = await getDoc(userDocRef);
     const savedProfile = userDoc.exists() ? userDoc.data() : {};
-    const role = savedProfile.role || profileFallback.role || 'user';
-    const status = savedProfile.status || profileFallback.status || 'active';
+    const isDefaultAdmin = isDefaultAdminEmail(firebaseUser.email);
+    const role = isDefaultAdmin ? 'superadmin' : savedProfile.role || profileFallback.role || 'user';
+    const status = isDefaultAdmin ? 'active' : savedProfile.status || profileFallback.status || 'active';
     const isAdminAccount = role === 'admin' || role === 'superadmin';
 
     if (options.requireAdmin && !isAdminAccount) {
@@ -573,9 +615,9 @@ function App() {
       throw error;
     }
 
-    const name = savedProfile.name || profileFallback.name || firebaseUser.displayName || 'Client';
+    const name = isDefaultAdmin ? 'Super Admin' : savedProfile.name || profileFallback.name || firebaseUser.displayName || 'Client';
     const phone = savedProfile.phone || profileFallback.phone || firebaseUser.phoneNumber || '';
-    const session = {
+    const session = normalizeAdminSession({
       token: await firebaseUser.getIdToken(),
       user: {
         id: firebaseUser.uid,
@@ -585,7 +627,7 @@ function App() {
         phone,
         status,
       },
-    };
+    });
 
     window.localStorage.removeItem(authStorageKey);
     window.localStorage.removeItem(userStorageKey);
@@ -877,6 +919,11 @@ function App() {
         });
         await routeSignedInUser(adminCredential.user, { name: 'Super Admin', role: 'superadmin', status: 'active' }, { requireAdmin: true });
       } catch (error) {
+        try {
+          if (auth.currentUser) await signOut(auth);
+        } catch {
+          // Continue with local default superadmin fallback.
+        }
         openDefaultAdminSession();
       }
       return;
@@ -948,10 +995,8 @@ function App() {
 
       if (resourceKey === 'superadmin') {
         if (itemData.password) {
-          const firebaseUser = await createBackendAuthUser(itemData);
-          const backendProfile = buildBackendUserProfile(itemData, firebaseUser.uid);
-          await setDoc(doc(db, config.collection, firebaseUser.uid), backendProfile, { merge: true });
-          createdItem = backendProfile;
+          const backendAccount = await createBackendAuthUser(itemData);
+          createdItem = backendAccount.profile;
           if (['admin', 'superadmin'].includes(createdItem.role)) {
             upsertLocalStaffAccount({ ...createdItem, password: itemData.password });
           }
