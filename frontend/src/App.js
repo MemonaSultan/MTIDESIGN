@@ -629,6 +629,60 @@ function App() {
     return profile;
   }
 
+  async function ensureDefaultSuperAdminFirebaseUser() {
+    let firebaseUser = auth.currentUser;
+    if (firebaseUser?.email?.trim().toLowerCase() !== defaultAdminEmail) {
+      try {
+        const credential = await signInWithEmailAndPassword(auth, defaultAdminEmail, defaultAdminPassword);
+        firebaseUser = credential.user;
+      } catch (signInError) {
+        if (!['auth/user-not-found', 'auth/invalid-credential'].includes(signInError.code)) {
+          throw signInError;
+        }
+        await createBackendAuthUser({
+          id: 'default-superadmin',
+          name: 'Super Admin',
+          email: defaultAdminEmail,
+          password: defaultAdminPassword,
+          role: 'superadmin',
+          status: 'active',
+          department: 'Management',
+          permissions: 'Full business control',
+        });
+        const credential = await signInWithEmailAndPassword(auth, defaultAdminEmail, defaultAdminPassword);
+        firebaseUser = credential.user;
+      }
+    }
+
+    await repairAdminRoleProfile(firebaseUser, {
+      id: firebaseUser.uid,
+      name: 'Super Admin',
+      email: defaultAdminEmail,
+      role: 'superadmin',
+      status: 'active',
+      department: 'Management',
+      permissions: 'Full business control',
+    });
+
+    const repairedSession = normalizeAdminSession({
+      ...adminSession,
+      token: await firebaseUser.getIdToken(),
+      user: {
+        ...(adminSession.user || {}),
+        id: firebaseUser.uid,
+        name: 'Super Admin',
+        email: defaultAdminEmail,
+        role: 'superadmin',
+        status: 'active',
+        department: 'Management',
+        permissions: 'Full business control',
+      },
+    });
+    setAdminSession(repairedSession);
+    window.localStorage.setItem(authStorageKey, JSON.stringify(repairedSession));
+    return firebaseUser;
+  }
+
   function findLocalStaffByEmail(email = '') {
     const normalizedEmail = email.trim().toLowerCase();
     return getLocalStaffAccounts().find(
@@ -644,9 +698,11 @@ function App() {
       throw error;
     }
 
-    if (sessionUser.role === 'superadmin') return auth.currentUser;
-
     const sessionEmail = sessionUser.email?.trim().toLowerCase();
+    if (sessionUser.role === 'superadmin' && isDefaultAdminEmail(sessionEmail)) {
+      return ensureDefaultSuperAdminFirebaseUser();
+    }
+
     const staffAccount = findLocalStaffByEmail(sessionEmail) || sessionUser;
     let firebaseUser = auth.currentUser;
 
