@@ -8,13 +8,14 @@ import AdminPanel from './AdminPanel';
 import UserPortal from './UserPortal';
 
 // Firebase Modules standard imports
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { deleteApp, initializeApp } from 'firebase/app';
+import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { 
   collection, doc, setDoc, addDoc, getDocs, getDoc, deleteDoc, query 
 } from 'firebase/firestore'; 
 
 // Humaray apnay config exports
-import { auth, db } from './firebase';
+import { auth, db, firebaseConfig } from './firebase';
 
 const authStorageKey = 'mti-admin-session';
 const userStorageKey = 'mti-user-session';
@@ -272,7 +273,7 @@ function App() {
         role: 'superadmin',
         status: 'active',
       };
-      const mergedUsers = [defaultSuperAdmin, ...localStaffAccounts, ...usersList].filter(
+      const mergedUsers = [defaultSuperAdmin, ...usersList, ...localStaffAccounts].filter(
         (user, index, list) => index === list.findIndex((item) => item.email === user.email || item.id === user.id)
       );
 
@@ -417,6 +418,7 @@ function App() {
         email: account.email,
         role: account.role,
         phone: account.phone || '',
+        status: account.status || 'active',
       },
     };
 
@@ -465,6 +467,67 @@ function App() {
     saveLocalStaffAccounts([normalizedAccount, ...accounts]);
   }
 
+  function buildBackendUserProfile(account, id) {
+    const profile = { ...account };
+    delete profile.password;
+    return {
+      ...profile,
+      id,
+      email: account.email?.trim().toLowerCase() || '',
+      role: account.role || 'user',
+      status: account.status || 'active',
+      name: account.name || '',
+      phone: account.phone || '',
+      department: account.department || 'Operations',
+      permissions: account.permissions || (account.role === 'superadmin' ? 'Full business control' : account.role === 'admin' ? 'Site management' : 'Client access only'),
+      createdAt: account.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async function ensureBackendUserProfile(firebaseUser, profileFallback = {}) {
+    const role = profileFallback.role || 'user';
+    const accountProfile = buildBackendUserProfile({
+      ...profileFallback,
+      email: firebaseUser.email,
+      name: profileFallback.name || firebaseUser.displayName || (role === 'user' ? 'Client' : 'Admin Account'),
+      role,
+      status: profileFallback.status || 'active',
+    }, firebaseUser.uid);
+
+    try {
+      await setDoc(doc(db, 'users', firebaseUser.uid), accountProfile, { merge: true });
+    } catch (error) {
+      console.warn('Could not sync Firebase user profile:', error);
+    }
+
+    return accountProfile;
+  }
+
+  async function createBackendAuthUser(account) {
+    const secondaryApp = initializeApp(firebaseConfig, `mti-admin-create-${Date.now()}`);
+    const secondaryAuth = getAuth(secondaryApp);
+
+    try {
+      let credential;
+      try {
+        credential = await createUserWithEmailAndPassword(secondaryAuth, account.email, account.password);
+      } catch (error) {
+        if (error.code !== 'auth/email-already-in-use') throw error;
+        credential = await signInWithEmailAndPassword(secondaryAuth, account.email, account.password);
+      }
+
+      return credential.user;
+    } finally {
+      try {
+        await signOut(secondaryAuth);
+      } catch {
+        // Secondary auth may already be signed out.
+      }
+      await deleteApp(secondaryApp);
+    }
+  }
+
   function showSiteSection(sectionId) {
     setViewMode('site');
     setMobileMenuOpen(false);
@@ -495,11 +558,18 @@ function App() {
     const userDoc = await getDoc(userDocRef);
     const savedProfile = userDoc.exists() ? userDoc.data() : {};
     const role = savedProfile.role || profileFallback.role || 'user';
+    const status = savedProfile.status || profileFallback.status || 'active';
     const isAdminAccount = role === 'admin' || role === 'superadmin';
 
     if (options.requireAdmin && !isAdminAccount) {
       const error = new Error('This account is not assigned an admin role.');
       error.code = 'mti/not-admin';
+      throw error;
+    }
+
+    if (isAdminAccount && status === 'suspended') {
+      const error = new Error('This staff account is suspended.');
+      error.code = 'mti/staff-suspended';
       throw error;
     }
 
@@ -513,6 +583,7 @@ function App() {
         email: firebaseUser.email,
         role,
         phone,
+        status,
       },
     };
 
@@ -795,26 +866,19 @@ function App() {
     setAdminFeedback((current) => ({ ...current, auth: '' }));
 
     if (isDefaultAdminLogin(adminAuth.email, adminAuth.password)) {
-      openDefaultAdminSession();
-      return;
-    }
-
-    const localStaffAccount = findLocalStaffLogin(adminAuth.email, adminAuth.password);
-    if (localStaffAccount) {
-      buildAdminSession(localStaffAccount);
-      return;
-    }
-
-    const localStaffEmail = getLocalStaffAccounts().find(
-      (account) => account.email?.trim().toLowerCase() === adminAuth.email.trim().toLowerCase()
-    );
-    if (localStaffEmail) {
-      setAdminFeedback((current) => ({
-        ...current,
-        auth: localStaffEmail.status === 'suspended'
-          ? 'This staff account is suspended.'
-          : 'The password for this staff account is incorrect.',
-      }));
+      try {
+        const adminCredential = await signInWithEmailAndPassword(auth, adminAuth.email, adminAuth.password);
+        await ensureBackendUserProfile(adminCredential.user, {
+          name: 'Super Admin',
+          role: 'superadmin',
+          status: 'active',
+          permissions: 'Full business control',
+          department: 'Management',
+        });
+        await routeSignedInUser(adminCredential.user, { name: 'Super Admin', role: 'superadmin', status: 'active' }, { requireAdmin: true });
+      } catch (error) {
+        openDefaultAdminSession();
+      }
       return;
     }
 
@@ -822,6 +886,25 @@ function App() {
       const adminCredential = await signInWithEmailAndPassword(auth, adminAuth.email, adminAuth.password);
       await routeSignedInUser(adminCredential.user, {}, { requireAdmin: true });
     } catch (error) {
+      const localStaffAccount = findLocalStaffLogin(adminAuth.email, adminAuth.password);
+      if (localStaffAccount) {
+        buildAdminSession(localStaffAccount);
+        return;
+      }
+
+      const localStaffEmail = getLocalStaffAccounts().find(
+        (account) => account.email?.trim().toLowerCase() === adminAuth.email.trim().toLowerCase()
+      );
+      if (localStaffEmail) {
+        setAdminFeedback((current) => ({
+          ...current,
+          auth: localStaffEmail.status === 'suspended'
+            ? 'This staff account is suspended.'
+            : 'The password for this staff account is incorrect.',
+        }));
+        return;
+      }
+
       setAdminFeedback((current) => ({ ...current, auth: getFriendlyAuthError(error) }));
     }
   }
@@ -861,10 +944,25 @@ function App() {
           return;
         }
       }
-      const docRef = await addDoc(collection(db, config.collection), itemData);
-      const createdItem = { id: docRef.id, ...itemData };
-      if (resourceKey === 'superadmin' && ['admin', 'superadmin'].includes(createdItem.role)) {
-        upsertLocalStaffAccount(createdItem);
+      let createdItem;
+
+      if (resourceKey === 'superadmin') {
+        if (itemData.password) {
+          const firebaseUser = await createBackendAuthUser(itemData);
+          const backendProfile = buildBackendUserProfile(itemData, firebaseUser.uid);
+          await setDoc(doc(db, config.collection, firebaseUser.uid), backendProfile, { merge: true });
+          createdItem = backendProfile;
+          if (['admin', 'superadmin'].includes(createdItem.role)) {
+            upsertLocalStaffAccount({ ...createdItem, password: itemData.password });
+          }
+        } else {
+          const backendProfile = buildBackendUserProfile(itemData, `profile-${Date.now()}`);
+          const docRef = await addDoc(collection(db, config.collection), backendProfile);
+          createdItem = { ...backendProfile, id: docRef.id };
+        }
+      } else {
+        const docRef = await addDoc(collection(db, config.collection), itemData);
+        createdItem = { id: docRef.id, ...itemData };
       }
 
       const nextItems = [createdItem, ...adminData[dataKey]];
@@ -875,38 +973,13 @@ function App() {
         ...current,
         [resourceKey]: resourceKey === 'superadmin'
           ? ['admin', 'superadmin'].includes(createdItem.role)
-            ? `${createdItem.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready. Use ${createdItem.email} with the password you entered.`
+            ? `${createdItem.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready in Firebase. Use ${createdItem.email} with the password you entered.`
             : `Client account for ${createdItem.email} is ready.`
           : `${config.title} dynamic entry added.`,
       }));
     } catch (error) {
       if (resourceKey === 'superadmin') {
-        const itemData = {
-          ...adminDrafts.superadmin,
-          id: `local-${Date.now()}`,
-          createdAt: new Date().toISOString(),
-        };
-        itemData.email = itemData.email?.trim().toLowerCase() || '';
-        itemData.role = itemData.role || 'admin';
-        itemData.status = itemData.status || 'active';
-        if (!itemData.name || !itemData.email) {
-          setAdminFeedback((current) => ({ ...current, superadmin: 'Name and email are required.' }));
-          return;
-        }
-        if (['admin', 'superadmin'].includes(itemData.role) && !itemData.password) {
-          setAdminFeedback((current) => ({ ...current, superadmin: 'Password is required for admin accounts.' }));
-          return;
-        }
-        if (['admin', 'superadmin'].includes(itemData.role)) upsertLocalStaffAccount(itemData);
-        const nextItems = [itemData, ...adminData.users];
-        setAdminData((current) => ({ ...current, users: nextItems }));
-        setAdminDrafts((current) => ({ ...current, superadmin: config.emptyItem }));
-        setAdminFeedback((current) => ({
-          ...current,
-          superadmin: ['admin', 'superadmin'].includes(itemData.role)
-            ? `${itemData.role === 'superadmin' ? 'Super admin' : 'Admin'} account is ready locally. Use ${itemData.email} with the password you entered.`
-            : `Client account for ${itemData.email} is ready locally.`,
-        }));
+        setAdminFeedback((current) => ({ ...current, superadmin: `Firebase account could not be created: ${getFriendlyAuthError(error)}` }));
         return;
       }
       setAdminFeedback((current) => ({ ...current, [resourceKey]: error.message }));
