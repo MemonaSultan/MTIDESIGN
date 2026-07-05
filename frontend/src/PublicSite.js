@@ -64,12 +64,6 @@ function PublicSite({
                 <strong>Luxury presentation built around wood, brass tones, and warm lighting.</strong>
               </div>
             </article>
-
-            <div className="hero-service-float" aria-label="MTI service highlights">
-              {['Curtains', 'Blinds', 'Wallpaper', 'Flooring', 'Furniture', 'Decor'].map((service) => (
-                <span key={service}>{service}</span>
-              ))}
-            </div>
           </div>
         </section>
 
