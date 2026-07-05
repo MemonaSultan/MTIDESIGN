@@ -881,9 +881,9 @@ function AdminPanel(props) {
             </button>
             <div className="admin-user-menu">
               <span className="admin-user-avatar">
-                {adminSession.user.name.charAt(0).toUpperCase()}
+                {roleName.charAt(0)}
               </span>
-              <span className="admin-user-name">{adminSession.user.name}</span>
+              <span className="admin-user-name">{roleName}</span>
               <button className="admin-logout-btn" type="button" onClick={handleAdminLogout}>
                 Logout
               </button>
